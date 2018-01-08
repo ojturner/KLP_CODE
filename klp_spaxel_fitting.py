@@ -38,6 +38,9 @@ sys.path.append('/disk2/turner/disk1/turner/PhD'
 sys.path.append('/disk2/turner/disk1/turner/PhD'
                 + '/KMOS/Analysis_Pipeline/Python_code/functions')
 
+# add the functions folder to the PYTHONPATH
+sys.path.append('/disk2/turner/disk2/turner/DATA/KLP/CODE')
+
 import flatfield_cube as f_f
 import psf_blurring as psf
 import twod_gaussian as g2d
@@ -47,6 +50,7 @@ import make_table
 import arctangent_1d as arc_mod
 import oned_gaussian as one_d_g
 import search_for_closest_sky as sky_search
+import mask_sky as mask_the_sky
 
 from cubeClass import cubeOps
 from galPhysClass import galPhys
@@ -334,7 +338,7 @@ def vel_field_stott_binning(incube,
 
     elif line == 'ha':
 
-        central_wl = 0.65646 * (1. + redshift)
+        central_wl = 0.6564614 * (1. + redshift)
 
     # find the index of the chosen emission line
     line_idx = np.argmin(np.abs(wave_array - central_wl))
@@ -380,8 +384,12 @@ def vel_field_stott_binning(incube,
             # velocity or the velocity dispersion should be affected by this
 
             spaxel_spec = data[:, i, j]
+            noise_from_hist = noise_from_histogram(wave_array,
+                                                   spaxel_spec,
+                                                   redshift,
+                                                   cube.filter)
             spaxel_median_flux = abs(np.nanmedian(spaxel_spec[350:1700]))
-
+            noise_from_hist = noise_from_hist / spaxel_median_flux
             # add failsafe for the median flux being nan
             if np.isnan(spaxel_median_flux):
                 spaxel_median_flux = 5E-19
@@ -2324,6 +2332,66 @@ def gauss_fit(fit_wl,
 
     return out.best_values, out.covar
 
+def noise_from_histogram(wave_array,
+                         spec,
+                         redshift,
+                         filt):
+    
+    """
+    Def:
+    Calculate the noise in every spaxel by masking the sky lines and
+    the emission lines and fitting a gaussian to the histogram of the
+    remaining flux values
+    """
+
+    # first mask the sky
+
+    wave_array, sky_masked_spec = mask_the_sky.masking_sky(wave_array,
+                                                           spec,
+                                                           filt)
+
+    # now mask the emission lines
+
+    sky_and_emission_line_masked_spec = mask_emission_lines(wave_array,
+                                                            spec,
+                                                            redshift,
+                                                            filt)
+
+    # plot
+
+    fig, ax = plt.subplots(1, 1, figsize=(16,10))
+    ax.plot(wave_array,sky_and_emission_line_masked_spec)
+    plt.show()
+    plt.close('all')
+
+    # recover the compressed spectrum
+
+    compressed_spec = sky_and_emission_line_masked_spec[100:1800].compressed()
+
+    # take only the 5th to 95th percentile
+    compressed_spec = np.sort(compressed_spec)
+    compressed_spec = compressed_spec[int(len(compressed_spec)/20.0):int(0.95*len(compressed_spec))]
+
+    bins, centres = np.histogram(compressed_spec, bins=20)
+    noise_mod = GaussianModel()
+    noise_pars = noise_mod.guess(bins, x=centres[:-1])
+    noise_result = noise_mod.fit(bins, params=noise_pars, x=centres[:-1])
+
+    #print noise_result.fit_report()
+    #print bins, centres
+    noise_best_fit = noise_result.eval(x=centres[:-1])
+    fig, ax = plt.subplots(1,1,figsize=(8,10))
+    ax.scatter(centres[:-1],bins)
+    ax.plot(centres[:-1],noise_best_fit)
+    plt.show()
+    plt.close('all')
+
+    noise = noise_result.best_values['sigma']
+
+    print 'THIS IS THE HISTOGRAM NOISE: %s ' % noise
+    return noise
+
+
 def sky_res(sky_flux,
             sky_wave,
             sky_x_dim,
@@ -2419,6 +2487,95 @@ def continuum_subtract_full(flux_array,
 #    plt.show()
 #    plt.close('all')
     return poly_best
+
+def mask_emission_lines(wave_array,
+                        spec,
+                        redshift,
+                        filt):
+
+    h_alpha_rest = 0.6564614
+    h_alpha_shifted = (1 + redshift) * h_alpha_rest
+    h_alpha_shifted_index = np.argmin(np.abs(wave_array - h_alpha_shifted))[0]
+    h_alpha_shifted_min = wave_array[h_alpha_shifted_index-15]
+    h_alpha_shifted_max = wave_array[h_alpha_shifted_index+15]
+    nii_rest = 0.658523
+    nii_shifted = (1 + redshift) * nii_rest
+    nii_shifted_index = np.argmin(np.abs(wave_array - nii_shifted))[0]
+    nii_shifted_min = wave_array[nii_shifted_index-15]
+    nii_shifted_max = wave_array[nii_shifted_index+15]
+    h_beta_rest = 0.4862721
+    h_beta_shifted = (1 + redshift) * h_beta_rest
+    h_beta_shifted_index = np.argmin(np.abs(wave_array - h_beta_shifted))[0]
+    h_beta_shifted_min = wave_array[h_beta_shifted_index-15]
+    h_beta_shifted_max = wave_array[h_beta_shifted_index+15]
+    oiii_4960_rest = 0.4960295
+    oiii_4960_shifted = (1 + redshift) * oiii_4960_rest
+    oiii_4960_shifted_index = np.argmin(np.abs(wave_array - oiii_4960_shifted))[0]
+    oiii_4960_shifted_min = wave_array[oiii_4960_shifted_index-15]
+    oiii_4960_shifted_max = wave_array[oiii_4960_shifted_index+15]
+    oiii_5008_rest = 0.5008239
+    oiii_5008_shifted = (1 + redshift) * oiii_5008_rest
+    oiii_5008_shifted_index = np.argmin(np.abs(wave_array - oiii_5008_shifted))[0]
+    oiii_5008_shifted_min = wave_array[oiii_5008_shifted_index-15]
+    oiii_5008_shifted_max = wave_array[oiii_5008_shifted_index+15]
+    oii_rest = 0.37284835
+    oii_shifted = (1 + redshift) * oii_rest
+    oii_shifted_index = np.argmin(np.abs(wave_array - oii_shifted))[0]
+    oii_shifted_min = wave_array[oii_shifted_index-15]
+    oii_shifted_max = wave_array[oii_shifted_index+15]
+
+    
+    # choose the appropriate sky dictionary for the filter
+    if filt == 'YJ':
+        print 'YJ-band emission lines to mask'
+
+        # also return a total masked spectrum which blocks out
+        # emission lines also
+
+        wave_array_total = copy(wave_array)   
+        wave_array_total = ma.masked_where(
+            np.logical_and(wave_array_total > oii_shifted_min,
+                           wave_array_total < oii_shifted_max),
+                           wave_array_total, copy=True)
+        spec_total = ma.MaskedArray(spec,
+                                    mask=wave_array_total.mask)
+
+
+    elif filt == 'H':
+        print 'H-band sky selected'
+
+        wave_array_total = copy(wave_array)   
+        wave_array_total = ma.masked_where(
+            np.logical_and(wave_array_total > h_beta_shifted_min,
+                           wave_array_total < h_beta_shifted_max),
+                           wave_array_total, copy=True)
+        wave_array_total = ma.masked_where(
+            np.logical_and(wave_array_total > oiii_4960_shifted_min,
+                           wave_array_total < oiii_4960_shifted_max),
+                           wave_array_total, copy=True)
+        wave_array_total = ma.masked_where(
+            np.logical_and(wave_array_total > oiii_5008_shifted_min,
+                           wave_array_total < oiii_5008_shifted_max),
+                           wave_array_total, copy=True)
+        spec_total = ma.MaskedArray(spec,
+                                    mask=wave_array_total.mask)
+
+    else:
+        print 'K-band sky selected'
+
+        wave_array_total = copy(wave_array)   
+        wave_array_total = ma.masked_where(
+            np.logical_and(wave_array_total > h_alpha_shifted_min,
+                           wave_array_total < h_alpha_shifted_max),
+                           wave_array_total, copy=True)
+        wave_array_total = ma.masked_where(
+            np.logical_and(wave_array_total > nii_shifted_min,
+                           wave_array_total < nii_shifted_max),
+                           wave_array_total, copy=True)
+        spec_total = ma.MaskedArray(spec,
+                                    mask=wave_array_total.mask)
+
+    return spec_total
 
 def perturb_value(noise,
                   flux_array):
