@@ -64,7 +64,7 @@ from vel_field_class import vel_field
 # look at just the Kband to check the performance
 # once the mask limits are supplied
 
-table_k = ascii.read('/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/Kband/KLP_K_NAMES_WITH_CONTINUUM.txt')
+table_k = ascii.read('/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/YJband/KLP_YJ_NAMES_WITH_CONTINUUM.txt')
 names_k = table_k['Filename']
 redshift_k = table_k['redshift']
 cont_x_lower_k = table_k['cont_x_lower']
@@ -120,11 +120,11 @@ for name, red, xl,xu,yl,yu in zip(names_k,
     fit_cont, fit_params = g2d.fit_gaussian(flatfield_continuum_k)
     print fit_params
 
-#    fig, ax = plt.subplots(1,1,figsize=(8,8))
-#    ax.imshow(flatfield_continuum_k)
-#    ax.contour(fit_cont)
-#    plt.show()
-#    plt.close('all')
+    fig, ax = plt.subplots(1,1,figsize=(8,8))
+    ax.imshow(flatfield_continuum_k)
+    ax.contour(fit_cont)
+    plt.show()
+    plt.close('all')
 
     # now we have successfully found the continuum centre
     # for each of the 26 cubes in the YJ, H and K bands. 
@@ -178,6 +178,8 @@ for name, red, xl,xu,yl,yu in zip(names_k,
 
     os.system('mv SHIFT.fits %s' % name)
 
+    print central_x_position,central_y_position
+
 # everything should now be shifted and stored in the original locations
 # not sure why the filesize of the shifted object is half that of
 # the original but going to roll with it
@@ -188,4 +190,4 @@ central_y_position = np.array(central_y_position)
 
 table_k['Central_x'] = central_x_position
 table_k['Central_y'] = central_y_position
-table_k.write('/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/Kband/KLP_K_NAMES.txt', format='ascii')
+table_k.write('/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/YJband/KLP_YJ_BOGUS.txt', format='ascii')

@@ -384,15 +384,8 @@ def vel_field_stott_binning(incube,
             # velocity or the velocity dispersion should be affected by this
 
             spaxel_spec = data[:, i, j]
-            noise_from_hist = noise_from_histogram(wave_array,
-                                                   spaxel_spec,
-                                                   redshift,
-                                                   cube.filter)
-            spaxel_median_flux = abs(np.nanmedian(spaxel_spec[350:1700]))
-            noise_from_hist = noise_from_hist / spaxel_median_flux
-            # add failsafe for the median flux being nan
-            if np.isnan(spaxel_median_flux):
-                spaxel_median_flux = 5E-19
+            #print 'FILTER: %s' % cube.filter
+            spaxel_median_flux = abs(np.nanmedian(spaxel_spec[350:1500]))
 
             # here subtract the continuum from the spaxel BEFORE
             # measuring the line counts. Only do this if the whole
@@ -401,13 +394,28 @@ def vel_field_stott_binning(incube,
 #            if not np.isnan(spaxel_median_flux):
 #                cont = continuum_subtract_full(spaxel_spec,
 #                                               wave_array,
+#                                               redshift,
 #                                               cube.filter)
-#                spaxel_spec = spaxel_spec - cont
+#                if cube.filter == 'K':
+#                    spaxel_spec[0:1600] = spaxel_spec[0:1600] - cont[0:1600]
+#                elif cube.filter == 'H':
+#                    spaxel_spec[0:1700] = spaxel_spec[0:1700] - cont[0:1700]
+#                elif cube.filter == 'YJ':
+#                    spaxel_spec[0:1900] = spaxel_spec[0:1900] - cont[0:1900]
+#            # recompute the spaxel median flux for consistency
+#            spaxel_median_flux = abs(np.nanmedian(spaxel_spec[350:1500]))            
 
-            # recompute the spaxel median flux for consistency
+            # add failsafe for the median flux being nan
+            if np.isnan(spaxel_median_flux):
+                spaxel_median_flux = 5E-19
 
             weights_array_norm = weights_array / spaxel_median_flux
             spaxel_spec = spaxel_spec/spaxel_median_flux
+            noise_from_hist = noise_from_histogram(wave_array,
+                                                   spaxel_spec,
+                                                   redshift,
+                                                   cube.filter)
+
             spaxel_noise = noise[:, i, j]/spaxel_median_flux
 
             # first search for the linepeak, which may be different
@@ -431,6 +439,13 @@ def vel_field_stott_binning(incube,
 
             line_counts = np.nansum(spaxel_spec[lower_limit:
                                                 upper_limit])
+
+            noise_from_masked_method = noise_from_masked_spectrum(wave_array,
+                                                                  spaxel_spec,
+                                                                  redshift,
+                                                                  len(spaxel_spec[lower_limit:upper_limit]),
+                                                                  line_idx,
+                                                                  cube.filter)
 
             line_counts = line_counts * cube.dL
 
@@ -526,7 +541,7 @@ def vel_field_stott_binning(incube,
 
                 raise ValueError('Please provide valid noise method')
 
-            #print 'NOISE VALUE %s' % line_noise
+            # print 'NOISE COMPARISON %s %s %s %s' % (line_noise,line_p_noise,noise_from_hist,noise_from_masked_method)
 
             # find the noise reduction factors of the binning methods
             # these feed into the binning_three and binning_five
@@ -550,6 +565,7 @@ def vel_field_stott_binning(incube,
             # print 'This is the original line noise: %s' % line_p_noise
 
             line_noise = line_noise * cube.dL
+            noise_from_masked_method = noise_from_masked_method * cube.dL
 
 #                print 'THIS IS THE SIGNAL %s' % line_counts
 #                print 'THIS IS THE NOISE %s' % line_noise
@@ -571,7 +587,7 @@ def vel_field_stott_binning(incube,
             # compute the signal to noise on the basis of the
             # above calculations
 
-            line_sn = line_counts / line_noise
+            line_sn = line_counts / noise_from_masked_method
 
             #print 'THIS IS THE SIGNAL TO NOISE: %s %s %s' % (line_sn,line_counts,line_noise)
 
@@ -631,7 +647,7 @@ def vel_field_stott_binning(incube,
                     # print 'fitting %sth gaussian' % loop
 
                     # get the perturbed array using the helper function
-                    new_flux = perturb_value(line_p_noise,
+                    new_flux = perturb_value(noise_from_hist,
                                              spaxel_spec[lower_limit:
                                                          upper_limit])
 
@@ -766,6 +782,18 @@ def vel_field_stott_binning(incube,
 
                 spec = spec/spaxel_median_flux
                 new_noise = new_noise/spaxel_median_flux
+                new_noise_from_histogram = noise_from_histogram(wave_array,
+                                                                spec,
+                                                                redshift,
+                                                                cube.filter)
+                new_noise_from_masked_method = noise_from_masked_spectrum(wave_array,
+                                                                  spec,
+                                                                  redshift,
+                                                                  len(spec[lower_limit:upper_limit]),
+                                                                  line_idx,
+                                                                  cube.filter)
+                new_noise_from_masked_method = new_noise_from_masked_method * cube.dL
+                spec = spec[lower_limit:upper_limit]
 
                 # now that spec has been computed, look at whether
                 # the signal to noise of the stack has improved
@@ -774,7 +802,7 @@ def vel_field_stott_binning(incube,
 
                 new_line_counts = new_line_counts * cube.dL
 
-                new_sn = new_line_counts / new_noise
+                new_sn = new_line_counts / new_noise_from_masked_method
 
                 # have to fit gaussian at this point as well
                 # and examine similarity between the gaussian fit
@@ -827,6 +855,8 @@ def vel_field_stott_binning(incube,
                     mc_centre_array = []
                     new_line_p_noise = line_p_noise / t_red
 
+                    # print 'NEW NOISE COMPARISON: %s %s %s' % (new_noise,new_line_p_noise,new_noise_from_histogram)
+
                     # print 'This is the noise: %s' % new_line_p_noise
                     # print 'This is the signal: %s' % spec
 
@@ -835,7 +865,7 @@ def vel_field_stott_binning(incube,
                         # print 'fitting %sth gaussian' % loop
 
                         # get the perturbed array using the helper function
-                        new_flux = perturb_value(new_line_p_noise,
+                        new_flux = perturb_value(new_noise_from_histogram,
                                                  spec)
 
                         # fit the gaussian to recover the parameters
@@ -971,6 +1001,18 @@ def vel_field_stott_binning(incube,
 
                     spec = spec / spaxel_median_flux
                     final_noise = final_noise / spaxel_median_flux
+                    final_noise_from_histogram = noise_from_histogram(wave_array,
+                                                                      spec,
+                                                                      redshift,
+                                                                      cube.filter)
+                    final_noise_from_masked_method = noise_from_masked_spectrum(wave_array,
+                                                                  spec,
+                                                                  redshift,
+                                                                  len(spec[lower_limit:upper_limit]),
+                                                                  line_idx,
+                                                                  cube.filter)
+                    final_noise_from_masked_method = final_noise_from_masked_method * cube.dL
+                    spec = spec[lower_limit:upper_limit]
 
                 # now that spec has been computed, look at whether
                 # the signal to noise of the stack has improved
@@ -979,7 +1021,7 @@ def vel_field_stott_binning(incube,
 
                     final_line_counts = cube.dL * final_line_counts
 
-                    final_sn = final_line_counts / final_noise
+                    final_sn = final_line_counts / final_noise_from_masked_method
 
                     plt.close('all')
 
@@ -1031,6 +1073,8 @@ def vel_field_stott_binning(incube,
                         mc_centre_array = []
                         final_line_p_noise = line_p_noise / f_red
 
+                        # print 'FINAL NOISE COMPARISON: %s %s %s' % (final_noise, final_line_p_noise, final_noise_from_histogram)
+
                         # print 'This is the final noise: %s' % final_line_p_noise
                         # print 'This is the signal: %s' % spec
                         # print f_red, line_p_noise, final_line_p_noise
@@ -1040,7 +1084,7 @@ def vel_field_stott_binning(incube,
                             # print 'fitting %sth gaussian' % loop
 
                             # get the perturbed array using the helper function
-                            new_flux = perturb_value(final_line_p_noise,
+                            new_flux = perturb_value(final_noise_from_histogram,
                                                      spec)
 
                             # print new_flux
@@ -1799,19 +1843,19 @@ def binning_three(data,
 
         if method == 'median':
 
-            spec = np.nanmedian(stack_array, axis=0)[lower_lim:upper_lim]
+            spec = np.nanmedian(stack_array, axis=0)
 
             new_noise_value = noise_value / red_factor
 
         elif method == 'sum':
 
-            spec = np.nansum(stack_array, axis=0)[lower_lim:upper_lim]
+            spec = np.nansum(stack_array, axis=0)
 
             new_noise_value = (9.0 / red_factor) * noise_value
 
         elif method == 'mean':
 
-            spec = np.nanmean(stack_array, axis=0)[lower_lim:upper_lim]
+            spec = np.nanmean(stack_array, axis=0)
 
             new_noise_value = noise_value / red_factor
 
@@ -1823,7 +1867,7 @@ def binning_three(data,
 
         # print 'encountered the cube boundary'
 
-        spec = data[:, i, j][lower_lim: upper_lim]
+        spec = data[:, i, j]
 
         new_noise_value = noise_value
 
@@ -1871,19 +1915,19 @@ def binning_five(data,
 
         if method == 'median':
 
-            spec = np.nanmedian(stack_array, axis=0)[lower_lim:upper_lim]
+            spec = np.nanmedian(stack_array, axis=0)
 
             new_noise_value = noise_value / red_factor
 
         elif method == 'sum':
 
-            spec = np.nansum(stack_array, axis=0)[lower_lim:upper_lim]
+            spec = np.nansum(stack_array, axis=0)
 
             new_noise_value = (25.0 / red_factor) * noise_value
 
         elif method == 'mean':
 
-            spec = np.nanmean(stack_array, axis=0)[lower_lim:upper_lim]
+            spec = np.nanmean(stack_array, axis=0)
 
             new_noise_value = noise_value / red_factor
 
@@ -1895,7 +1939,7 @@ def binning_five(data,
 
         # print 'encountered the cube boundary'
 
-        spec = data[:, i, j][lower_lim: upper_lim]
+        spec = data[:, i, j]
 
         new_noise_value = noise_value
 
@@ -2332,6 +2376,64 @@ def gauss_fit(fit_wl,
 
     return out.best_values, out.covar
 
+def noise_from_masked_spectrum(wave_array,
+                               spec,
+                               redshift,
+                               region_length,
+                               spec_index,
+                               filt):
+    
+    """
+    Def:
+    Calculate the noise in every spaxel by masking the sky lines and
+    the emission lines and fitting a gaussian to the histogram of the
+    remaining flux values
+    """
+
+    # first mask the sky
+
+    wave_array, sky_masked_spec = mask_the_sky.masking_sky(wave_array,
+                                                           spec,
+                                                           filt)
+
+    # now mask the emission lines
+
+    sky_and_emission_line_masked_spec = mask_emission_lines(wave_array,
+                                                            sky_masked_spec,
+                                                            redshift,
+                                                            filt)
+
+    # plot
+
+#    fig, ax = plt.subplots(1, 1, figsize=(16,10))
+#    ax.plot(wave_array,sky_and_emission_line_masked_spec)
+#    plt.show()
+#    plt.close('all')
+
+    # now going to step out from the central wavelength point and
+    # look for unmasked spectral pixels, appending these to a signal
+    # array, computing the signal from them and appending to a 
+    # standard deviation array from which the noise will be calculated
+
+    std_array = []
+    search_index = 1
+    while len(std_array) < 8:
+        signal_array = []
+        while len(signal_array) < region_length:
+            low_index = spec_index - search_index
+            # only consider 'good' spectral range
+            if low_index > 100:
+                if sky_and_emission_line_masked_spec[low_index]:
+                    signal_array.append(sky_and_emission_line_masked_spec[low_index])
+            high_index = spec_index + search_index
+            if high_index < 1750:
+                if sky_and_emission_line_masked_spec[high_index]:
+                    signal_array.append(sky_and_emission_line_masked_spec[high_index])
+            search_index += 1
+        std_array.append(np.nansum(signal_array))
+    
+    return np.std(std_array)
+
 def noise_from_histogram(wave_array,
                          spec,
                          redshift,
@@ -2353,20 +2455,20 @@ def noise_from_histogram(wave_array,
     # now mask the emission lines
 
     sky_and_emission_line_masked_spec = mask_emission_lines(wave_array,
-                                                            spec,
+                                                            sky_masked_spec,
                                                             redshift,
                                                             filt)
 
     # plot
 
-    fig, ax = plt.subplots(1, 1, figsize=(16,10))
-    ax.plot(wave_array,sky_and_emission_line_masked_spec)
-    plt.show()
-    plt.close('all')
+#    fig, ax = plt.subplots(1, 1, figsize=(16,10))
+#    ax.plot(wave_array,sky_and_emission_line_masked_spec)
+#    plt.show()
+#    plt.close('all')
 
     # recover the compressed spectrum
 
-    compressed_spec = sky_and_emission_line_masked_spec[100:1800].compressed()
+    compressed_spec = sky_and_emission_line_masked_spec[100:1700].compressed()
 
     # take only the 5th to 95th percentile
     compressed_spec = np.sort(compressed_spec)
@@ -2379,16 +2481,14 @@ def noise_from_histogram(wave_array,
 
     #print noise_result.fit_report()
     #print bins, centres
-    noise_best_fit = noise_result.eval(x=centres[:-1])
-    fig, ax = plt.subplots(1,1,figsize=(8,10))
-    ax.scatter(centres[:-1],bins)
-    ax.plot(centres[:-1],noise_best_fit)
-    plt.show()
-    plt.close('all')
+#    noise_best_fit = noise_result.eval(x=centres[:-1])
+#    fig, ax = plt.subplots(1,1,figsize=(8,10))
+#    ax.scatter(centres[:-1],bins)
+#    ax.plot(centres[:-1],noise_best_fit)
+#    plt.show()
+#    plt.close('all')
 
     noise = noise_result.best_values['sigma']
-
-    print 'THIS IS THE HISTOGRAM NOISE: %s ' % noise
     return noise
 
 
@@ -2422,6 +2522,7 @@ def sky_res(sky_flux,
 
 def continuum_subtract_full(flux_array,
                             wave_array,
+                            redshift,
                             filt):
 
     """
@@ -2440,14 +2541,25 @@ def continuum_subtract_full(flux_array,
 
     """
 
+    # first mask the sky
 
+    wave_array, sky_masked_spec = mask_the_sky.masking_sky(wave_array,
+                                                           flux_array,
+                                                           filt)
+
+    # now mask the emission lines
+
+    sky_and_line_masked_spec = mask_emission_lines(wave_array,
+                                                   sky_masked_spec,
+                                                   redshift,
+                                                   filt)
     # now do a running median - want to fit to this
     # rather than to the actual noisy data
     # depends on filt and fit_filt combination 
-    bins = np.linspace(wave_array[100], wave_array[1800], 300)
+    bins = np.linspace(wave_array[100], wave_array[1800], 50)
     delta = bins[1] - bins[0]
     idx = np.digitize(wave_array, bins)
-    running_median = [np.nanmedian(flux_array[idx==k]) for k in range(300)]
+    running_median = [np.nanmedian(sky_and_line_masked_spec[idx==k]) for k in range(50)]
 
     xl = 100
     xu = 1800
@@ -2468,7 +2580,7 @@ def continuum_subtract_full(flux_array,
     pars['c7'].set(value=0)
 
 #    fig, ax = plt.subplots(1,1,figsize=(18,8))
-#    ax.plot(wave_array[xl:xu],flux_array[xl:xu],drawstyle='steps-mid')
+#    ax.plot(wave_array[xl:xu],sky_and_line_masked_spec[xl:xu],drawstyle='steps-mid')
 #    plt.show()
 #    plt.close('all')
 #    fig, ax = plt.subplots(1,1,figsize=(18,8))
@@ -2482,8 +2594,8 @@ def continuum_subtract_full(flux_array,
     poly_best = out.eval(x=wave_array)
 
 #    fig, ax = plt.subplots(1,1,figsize=(18,8))
-#    ax.plot(wave_array[100:1800],flux_array[100:1800],drawstyle='steps-mid')
-#    ax.plot(wave_array[100:1800],poly_best[100:1800],drawstyle='steps-mid',color='red',lw=2)
+#    ax.plot(wave_array[100:1750],sky_and_line_masked_spec[100:1750],drawstyle='steps-mid')
+#    ax.plot(wave_array[100:1750],poly_best[100:1750],drawstyle='steps-mid',color='red',lw=2)
 #    plt.show()
 #    plt.close('all')
     return poly_best
@@ -2492,42 +2604,16 @@ def mask_emission_lines(wave_array,
                         spec,
                         redshift,
                         filt):
-
-    h_alpha_rest = 0.6564614
-    h_alpha_shifted = (1 + redshift) * h_alpha_rest
-    h_alpha_shifted_index = np.argmin(np.abs(wave_array - h_alpha_shifted))[0]
-    h_alpha_shifted_min = wave_array[h_alpha_shifted_index-15]
-    h_alpha_shifted_max = wave_array[h_alpha_shifted_index+15]
-    nii_rest = 0.658523
-    nii_shifted = (1 + redshift) * nii_rest
-    nii_shifted_index = np.argmin(np.abs(wave_array - nii_shifted))[0]
-    nii_shifted_min = wave_array[nii_shifted_index-15]
-    nii_shifted_max = wave_array[nii_shifted_index+15]
-    h_beta_rest = 0.4862721
-    h_beta_shifted = (1 + redshift) * h_beta_rest
-    h_beta_shifted_index = np.argmin(np.abs(wave_array - h_beta_shifted))[0]
-    h_beta_shifted_min = wave_array[h_beta_shifted_index-15]
-    h_beta_shifted_max = wave_array[h_beta_shifted_index+15]
-    oiii_4960_rest = 0.4960295
-    oiii_4960_shifted = (1 + redshift) * oiii_4960_rest
-    oiii_4960_shifted_index = np.argmin(np.abs(wave_array - oiii_4960_shifted))[0]
-    oiii_4960_shifted_min = wave_array[oiii_4960_shifted_index-15]
-    oiii_4960_shifted_max = wave_array[oiii_4960_shifted_index+15]
-    oiii_5008_rest = 0.5008239
-    oiii_5008_shifted = (1 + redshift) * oiii_5008_rest
-    oiii_5008_shifted_index = np.argmin(np.abs(wave_array - oiii_5008_shifted))[0]
-    oiii_5008_shifted_min = wave_array[oiii_5008_shifted_index-15]
-    oiii_5008_shifted_max = wave_array[oiii_5008_shifted_index+15]
-    oii_rest = 0.37284835
-    oii_shifted = (1 + redshift) * oii_rest
-    oii_shifted_index = np.argmin(np.abs(wave_array - oii_shifted))[0]
-    oii_shifted_min = wave_array[oii_shifted_index-15]
-    oii_shifted_max = wave_array[oii_shifted_index+15]
-
     
     # choose the appropriate sky dictionary for the filter
     if filt == 'YJ':
-        print 'YJ-band emission lines to mask'
+
+        oii_rest = 0.37284835
+        oii_shifted = (1 + redshift) * oii_rest
+        oii_shifted_index = np.argmin(np.abs(wave_array - oii_shifted))
+        oii_shifted_min = wave_array[oii_shifted_index-20]
+        oii_shifted_max = wave_array[oii_shifted_index+20]
+        #print 'YJ-band emission lines to mask'
 
         # also return a total masked spectrum which blocks out
         # emission lines also
@@ -2542,7 +2628,23 @@ def mask_emission_lines(wave_array,
 
 
     elif filt == 'H':
-        print 'H-band sky selected'
+
+        h_beta_rest = 0.4862721
+        h_beta_shifted = (1 + redshift) * h_beta_rest
+        h_beta_shifted_index = np.argmin(np.abs(wave_array - h_beta_shifted))
+        h_beta_shifted_min = wave_array[h_beta_shifted_index-20]
+        h_beta_shifted_max = wave_array[h_beta_shifted_index+20]
+        oiii_4960_rest = 0.4960295
+        oiii_4960_shifted = (1 + redshift) * oiii_4960_rest
+        oiii_4960_shifted_index = np.argmin(np.abs(wave_array - oiii_4960_shifted))
+        oiii_4960_shifted_min = wave_array[oiii_4960_shifted_index-20]
+        oiii_4960_shifted_max = wave_array[oiii_4960_shifted_index+20]
+        oiii_5008_rest = 0.5008239
+        oiii_5008_shifted = (1 + redshift) * oiii_5008_rest
+        oiii_5008_shifted_index = np.argmin(np.abs(wave_array - oiii_5008_shifted))
+        oiii_5008_shifted_min = wave_array[oiii_5008_shifted_index-20]
+        oiii_5008_shifted_max = wave_array[oiii_5008_shifted_index+20]
+        #print 'H-band emission lines to mask'
 
         wave_array_total = copy(wave_array)   
         wave_array_total = ma.masked_where(
@@ -2561,7 +2663,29 @@ def mask_emission_lines(wave_array,
                                     mask=wave_array_total.mask)
 
     else:
-        print 'K-band sky selected'
+
+        h_alpha_rest = 0.6564614
+        h_alpha_shifted = (1 + redshift) * h_alpha_rest
+        h_alpha_shifted_index = np.argmin(np.abs(wave_array - h_alpha_shifted))
+        h_alpha_shifted_min = wave_array[h_alpha_shifted_index-20]
+        h_alpha_shifted_max = wave_array[h_alpha_shifted_index+20]
+        nii_rest = 0.658523
+        nii_shifted = (1 + redshift) * nii_rest
+        nii_shifted_index = np.argmin(np.abs(wave_array - nii_shifted))
+        nii_shifted_min = wave_array[nii_shifted_index-20]
+        nii_shifted_max = wave_array[nii_shifted_index+20]
+        sii_lower_rest = 0.671829
+        sii_lower_shifted = (1 + redshift) * sii_lower_rest
+        sii_lower_shifted_index = np.argmin(np.abs(wave_array - sii_lower_shifted))
+        sii_lower_shifted_min = wave_array[sii_lower_shifted_index-20]
+        sii_lower_shifted_max = wave_array[sii_lower_shifted_index+20]
+        sii_upper_rest = 0.671829
+        sii_upper_shifted = (1 + redshift) * sii_upper_rest
+        sii_upper_shifted_index = np.argmin(np.abs(wave_array - sii_upper_shifted))
+        sii_upper_shifted_min = wave_array[sii_upper_shifted_index-20]
+        sii_upper_shifted_max = wave_array[sii_upper_shifted_index+20]
+
+        #print 'K-band emission lines to mask'
 
         wave_array_total = copy(wave_array)   
         wave_array_total = ma.masked_where(
@@ -2571,6 +2695,14 @@ def mask_emission_lines(wave_array,
         wave_array_total = ma.masked_where(
             np.logical_and(wave_array_total > nii_shifted_min,
                            wave_array_total < nii_shifted_max),
+                           wave_array_total, copy=True)
+        wave_array_total = ma.masked_where(
+            np.logical_and(wave_array_total > sii_lower_shifted_min,
+                           wave_array_total < sii_lower_shifted_max),
+                           wave_array_total, copy=True)
+        wave_array_total = ma.masked_where(
+            np.logical_and(wave_array_total > sii_upper_shifted_min,
+                           wave_array_total < sii_upper_shifted_max),
                            wave_array_total, copy=True)
         spec_total = ma.MaskedArray(spec,
                                     mask=wave_array_total.mask)
@@ -2605,8 +2737,8 @@ def perturb_value(noise,
 
     return ran_array + flux_array
 
-multi_vel_field_stott('/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/Hband/KLP_H_NAMES.txt',
-                      'oiii',
+multi_vel_field_stott('/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/Kband/KLP_K_NAMES.txt',
+                      'ha',
                       3.0,
                       g_c_min=0.5,
                       g_c_max=1.5,
