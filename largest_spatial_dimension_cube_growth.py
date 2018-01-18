@@ -41,9 +41,9 @@ from cubeClass import cubeOps
 # the continuum centre in each waveband and move to the centre of this
 # homogenised cube
 
-kband_names = ascii.read('/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/Kband/KLP_K_NAMES.txt')['Filename']
-hband_names = ascii.read('/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/Hband/KLP_H_NAMES.txt')['Filename']
-yjband_names = ascii.read('/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/YJband/KLP_YJ_NAMES.txt')['Filename']
+kband_names = ascii.read('/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/Kband/KLP_K_NAMES_WITH_CONTINUUM.txt')['Filename']
+hband_names = ascii.read('/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/Hband/KLP_H_NAMES_WITH_CONTINUUM.txt')['Filename']
+yjband_names = ascii.read('/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/YJband/KLP_YJ_NAMES_WITH_CONTINUUM.txt')['Filename']
 
 # start with each entry in the kband list of files
 # and check whether it exists in the hband and yjband

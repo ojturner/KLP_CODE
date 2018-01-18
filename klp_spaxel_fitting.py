@@ -61,6 +61,7 @@ def multi_vel_field_stott(infile,
                           threshold,
                           g_c_min,
                           g_c_max,
+                          ntimes=200,
                           **kwargs):
 
     """
@@ -101,7 +102,7 @@ def multi_vel_field_stott(infile,
 
         mask_y_upper = entry['mask_y_upper']
 
-        noise_method = 'cube'
+        noise_method = 'mask'
 
         # define the science directory for each cube
         sci_dir = obj_name[:len(obj_name) - obj_name[::-1].find("/") - 1]
@@ -149,7 +150,8 @@ def multi_vel_field_stott(infile,
                                 g_c_max,
                                 tol=tolerance,
                                 method=stack_method,
-                                noise_method=noise_method)
+                                noise_method=noise_method,
+                                ntimes=ntimes)
 
 def vel_field_stott_binning(incube,
                             sky_cube,
@@ -328,17 +330,25 @@ def vel_field_stott_binning(incube,
 
         central_wl = 0.500824 * (1. + redshift)
 
+    elif line == 'oiiiweak':
+
+        central_wl = 0.4960295 * (1. + redshift)
+
     elif line == 'hb':
 
         central_wl = 0.486268 * (1. + redshift)
 
     elif line == 'oii':
 
-        central_wl = 0.37275 * (1. + redshift)
+        central_wl = 0.3728485 * (1. + redshift)
 
     elif line == 'ha':
 
         central_wl = 0.6564614 * (1. + redshift)
+
+    elif line == 'nii':
+
+        central_wl = 0.658527 * (1. + redshift)
 
     # find the index of the chosen emission line
     line_idx = np.argmin(np.abs(wave_array - central_wl))
@@ -386,6 +396,13 @@ def vel_field_stott_binning(incube,
             spaxel_spec = data[:, i, j]
             #print 'FILTER: %s' % cube.filter
             spaxel_median_flux = abs(np.nanmedian(spaxel_spec[350:1500]))
+            noise_from_hist, noise_centre = noise_from_histogram(wave_array,
+                                                                 spaxel_spec/spaxel_median_flux,
+                                                                 redshift,
+                                                                 cube.filter)
+            # just assume flat continuum for now
+            spaxel_spec = spaxel_spec - (noise_centre*spaxel_median_flux)
+            spaxel_median_flux = abs(np.nanmedian(spaxel_spec[350:1500]))
 
             # here subtract the continuum from the spaxel BEFORE
             # measuring the line counts. Only do this if the whole
@@ -411,11 +428,6 @@ def vel_field_stott_binning(incube,
 
             weights_array_norm = weights_array / spaxel_median_flux
             spaxel_spec = spaxel_spec/spaxel_median_flux
-            noise_from_hist = noise_from_histogram(wave_array,
-                                                   spaxel_spec,
-                                                   redshift,
-                                                   cube.filter)
-
             spaxel_noise = noise[:, i, j]/spaxel_median_flux
 
             # first search for the linepeak, which may be different
@@ -440,12 +452,12 @@ def vel_field_stott_binning(incube,
             line_counts = np.nansum(spaxel_spec[lower_limit:
                                                 upper_limit])
 
-            noise_from_masked_method = noise_from_masked_spectrum(wave_array,
-                                                                  spaxel_spec,
-                                                                  redshift,
-                                                                  len(spaxel_spec[lower_limit:upper_limit]),
-                                                                  line_idx,
-                                                                  cube.filter)
+#            noise_from_masked_method = noise_from_masked_spectrum(wave_array,
+#                                                                  spaxel_spec,
+#                                                                  redshift,
+#                                                                  len(spaxel_spec[lower_limit:upper_limit]),
+#                                                                  line_idx,
+#                                                                  cube.filter)
 
             line_counts = line_counts * cube.dL
 
@@ -523,7 +535,7 @@ def vel_field_stott_binning(incube,
                                                            mask_y_upper)
 
                 line_noise = line_noise/spaxel_median_flux
-                line_p_noise = line_noise/spaxel_median_flux
+                line_p_noise = line_p_noise/spaxel_median_flux
 
             elif noise_method == 'cube':
 
@@ -541,7 +553,7 @@ def vel_field_stott_binning(incube,
 
                 raise ValueError('Please provide valid noise method')
 
-            # print 'NOISE COMPARISON %s %s %s %s' % (line_noise,line_p_noise,noise_from_hist,noise_from_masked_method)
+            # print 'NOISE COMPARISON %s %s %s' % (line_noise,line_p_noise,noise_from_hist)
 
             # find the noise reduction factors of the binning methods
             # these feed into the binning_three and binning_five
@@ -565,7 +577,7 @@ def vel_field_stott_binning(incube,
             # print 'This is the original line noise: %s' % line_p_noise
 
             line_noise = line_noise * cube.dL
-            noise_from_masked_method = noise_from_masked_method * cube.dL
+#            noise_from_masked_method = noise_from_masked_method * cube.dL
 
 #                print 'THIS IS THE SIGNAL %s' % line_counts
 #                print 'THIS IS THE NOISE %s' % line_noise
@@ -580,6 +592,8 @@ def vel_field_stott_binning(incube,
 
                 signal_array[i, j] = line_counts*spaxel_median_flux
 
+            # print 'LINE COUNTS CHECK: %s %s' % (line_counts,line_counts*spaxel_median_flux)
+
             # populate the noise array
 
             noise_array[i, j] = line_noise*spaxel_median_flux
@@ -587,7 +601,7 @@ def vel_field_stott_binning(incube,
             # compute the signal to noise on the basis of the
             # above calculations
 
-            line_sn = line_counts / noise_from_masked_method
+            line_sn = line_counts / line_noise
 
             #print 'THIS IS THE SIGNAL TO NOISE: %s %s %s' % (line_sn,line_counts,line_noise)
 
@@ -647,7 +661,7 @@ def vel_field_stott_binning(incube,
                     # print 'fitting %sth gaussian' % loop
 
                     # get the perturbed array using the helper function
-                    new_flux = perturb_value(noise_from_hist,
+                    new_flux = perturb_value(line_p_noise,
                                              spaxel_spec[lower_limit:
                                                          upper_limit])
 
@@ -782,17 +796,17 @@ def vel_field_stott_binning(incube,
 
                 spec = spec/spaxel_median_flux
                 new_noise = new_noise/spaxel_median_flux
-                new_noise_from_histogram = noise_from_histogram(wave_array,
-                                                                spec,
-                                                                redshift,
-                                                                cube.filter)
-                new_noise_from_masked_method = noise_from_masked_spectrum(wave_array,
-                                                                  spec,
-                                                                  redshift,
-                                                                  len(spec[lower_limit:upper_limit]),
-                                                                  line_idx,
-                                                                  cube.filter)
-                new_noise_from_masked_method = new_noise_from_masked_method * cube.dL
+#                new_noise_from_histogram, new_noise_centre = noise_from_histogram(wave_array,
+#                                                                                  spec,
+#                                                                                  redshift,
+#                                                                                  cube.filter)
+#                new_noise_from_masked_method = noise_from_masked_spectrum(wave_array,
+#                                                                  spec,
+#                                                                  redshift,
+#                                                                  len(spec[lower_limit:upper_limit]),
+#                                                                  line_idx,
+#                                                                  cube.filter)
+#                new_noise_from_masked_method = new_noise_from_masked_method * cube.dL
                 spec = spec[lower_limit:upper_limit]
 
                 # now that spec has been computed, look at whether
@@ -802,7 +816,7 @@ def vel_field_stott_binning(incube,
 
                 new_line_counts = new_line_counts * cube.dL
 
-                new_sn = new_line_counts / new_noise_from_masked_method
+                new_sn = new_line_counts / new_noise
 
                 # have to fit gaussian at this point as well
                 # and examine similarity between the gaussian fit
@@ -865,7 +879,7 @@ def vel_field_stott_binning(incube,
                         # print 'fitting %sth gaussian' % loop
 
                         # get the perturbed array using the helper function
-                        new_flux = perturb_value(new_noise_from_histogram,
+                        new_flux = perturb_value(new_line_p_noise,
                                                  spec)
 
                         # fit the gaussian to recover the parameters
@@ -1001,17 +1015,17 @@ def vel_field_stott_binning(incube,
 
                     spec = spec / spaxel_median_flux
                     final_noise = final_noise / spaxel_median_flux
-                    final_noise_from_histogram = noise_from_histogram(wave_array,
-                                                                      spec,
-                                                                      redshift,
-                                                                      cube.filter)
-                    final_noise_from_masked_method = noise_from_masked_spectrum(wave_array,
-                                                                  spec,
-                                                                  redshift,
-                                                                  len(spec[lower_limit:upper_limit]),
-                                                                  line_idx,
-                                                                  cube.filter)
-                    final_noise_from_masked_method = final_noise_from_masked_method * cube.dL
+#                    final_noise_from_histogram, final_noise_centre = noise_from_histogram(wave_array,
+#                                                                                          spec,
+#                                                                                          redshift,
+#                                                                                          cube.filter)
+#                    final_noise_from_masked_method = noise_from_masked_spectrum(wave_array,
+#                                                                  spec,
+#                                                                  redshift,
+#                                                                  len(spec[lower_limit:upper_limit]),
+#                                                                  line_idx,
+#                                                                  cube.filter)
+#                    final_noise_from_masked_method = final_noise_from_masked_method * cube.dL
                     spec = spec[lower_limit:upper_limit]
 
                 # now that spec has been computed, look at whether
@@ -1021,7 +1035,7 @@ def vel_field_stott_binning(incube,
 
                     final_line_counts = cube.dL * final_line_counts
 
-                    final_sn = final_line_counts / final_noise_from_masked_method
+                    final_sn = final_line_counts / final_noise
 
                     plt.close('all')
 
@@ -1084,7 +1098,7 @@ def vel_field_stott_binning(incube,
                             # print 'fitting %sth gaussian' % loop
 
                             # get the perturbed array using the helper function
-                            new_flux = perturb_value(final_noise_from_histogram,
+                            new_flux = perturb_value(final_line_p_noise,
                                                      spec)
 
                             # print new_flux
@@ -1224,45 +1238,80 @@ def vel_field_stott_binning(incube,
 
         vel_min, vel_max = np.nanpercentile(vel_array[mask_x_lower:mask_x_upper,
                                                       mask_y_lower:mask_y_upper],
-                                            [5.0, 95.0])
+                                            [15.0, 85.0])
+    except TypeError:
+
+        vel_min, vel_max = [-100, 100]
+
+    try:
+
         sig_min, sig_max = np.nanpercentile(disp_array[mask_x_lower:mask_x_upper,
                                                        mask_y_lower:mask_y_upper],
-                                            [5.0, 95.0])
-        flux_min, flux_max = np.nanpercentile(flux_array[mask_x_lower:mask_x_upper,
-                                                         mask_y_lower:mask_y_upper],
-                                              [5.0, 95.0])
-
-        s_min, s_max = np.nanpercentile(signal_array[mask_x_lower:mask_x_upper,
-                                                     mask_y_lower:mask_y_upper],
-                                        [5.0, 95.0])
-
-        sn_min, sn_max = np.nanpercentile(sn_array[mask_x_lower:mask_x_upper,
-                                                     mask_y_lower:mask_y_upper],
-                                        [5.0, 95.0])
-
-        g_min, g_max = np.nanpercentile(measurement_array[mask_x_lower:mask_x_upper,
-                                                     mask_y_lower:mask_y_upper],
-                                        [5.0, 95.0])
-
-        er_min, er_max = np.nanpercentile(vel_error_array[mask_x_lower:mask_x_upper,
-                                                     mask_y_lower:mask_y_upper],
-                                        [5.0, 95.0])
-
-        sig_er_min, sig_er_max = np.nanpercentile(sig_error_array[mask_x_lower:mask_x_upper,
-                                                     mask_y_lower:mask_y_upper],
-                                        [5.0, 95.0])
+                                            [15.0, 85.0])
 
     except TypeError:
 
-        # origin of the error is lack of good S/N data
-        # can set the max and min at whatever
-        vel_min, vel_max = [-100, 100]
         sig_min, sig_max = [0, 150]
+
+    try:
+
+        flux_min, flux_max = np.nanpercentile(flux_array[mask_x_lower:mask_x_upper,
+                                                         mask_y_lower:mask_y_upper],
+                                              [15.0, 85.0])
+
+    except TypeError:
+
         flux_min, flux_max = [0, 5E-3]
+
+    try:
+
+        s_min, s_max = np.nanpercentile(signal_array[mask_x_lower:mask_x_upper,
+                                                     mask_y_lower:mask_y_upper],
+                                        [15.0, 85.0])
+
+    except TypeError:
+
+
         s_min, s_max = [0, 0.01]
+
+    try:
+
+        sn_min, sn_max = np.nanpercentile(sn_array[mask_x_lower:mask_x_upper,
+                                                     mask_y_lower:mask_y_upper],
+                                        [15.0, 85.0])
+
+    except TypeError:
+
         sn_min, sn_max = [0, 10]
+
+    try:
+
+        g_min, g_max = np.nanpercentile(measurement_array[mask_x_lower:mask_x_upper,
+                                                     mask_y_lower:mask_y_upper],
+                                        [15.0, 85.0])
+
+    except TypeError:
+
         g_min, g_max = [0, 1.5]
+
+    try:
+
+        er_min, er_max = np.nanpercentile(vel_error_array[mask_x_lower:mask_x_upper,
+                                                     mask_y_lower:mask_y_upper],
+                                        [15.0, 85.0])
+
+    except TypeError:
+
         er_min, er_max = [0, 100]
+
+    try:
+
+        sig_er_min, sig_er_max = np.nanpercentile(sig_error_array[mask_x_lower:mask_x_upper,
+                                                     mask_y_lower:mask_y_upper],
+                                        [15.0, 85.0])
+
+    except TypeError:
+
         sig_er_min, sig_er_max = [0, 100]
 
     plt.close('all')
@@ -1301,7 +1350,7 @@ def vel_field_stott_binning(incube,
     plt.colorbar(im, cax=cax_new)
 
     # set the title
-    ax[0].set_title('[OIII] Flux')
+    ax[0].set_title('%s Flux' % line)
 
     vel_cut = vel_array[mask_x_lower:mask_x_upper,
                         mask_y_lower:mask_y_upper]
@@ -1390,7 +1439,7 @@ def vel_field_stott_binning(incube,
 
     try:
         int_sig_min, int_sig_max = np.nanpercentile(masked_int_sig_array,
-                                                    [5.0, 95.0])
+                                                    [15.0, 85.0])
     except TypeError:
 
         int_sig_min, int_sig_max = [50, 100]
@@ -1425,7 +1474,7 @@ def vel_field_stott_binning(incube,
     plt.colorbar(im, cax=cax_new)
 
     # set the title
-    ax[1].set_title('[OIII] Velocity')
+    ax[1].set_title('%s Velocity' % line)
 
     disp_cut = disp_array[mask_x_lower:mask_x_upper,
                           mask_y_lower:mask_y_upper]
@@ -1445,6 +1494,78 @@ def vel_field_stott_binning(incube,
 
                 masked_disp_array[i][j] = masked_disp_array[i][j]
 
+    disp_cut = vel_error_array[mask_x_lower:mask_x_upper,
+                               mask_y_lower:mask_y_upper]
+
+    masked_vel_error_array = np.nan * np.empty(shape=(xpixs, ypixs))
+
+    for i in range(xpixs):
+
+        for j in range(ypixs):
+
+            if (i >= mask_x_lower and i < mask_x_upper) \
+               and (j >= mask_y_lower and j < mask_y_upper):
+
+                masked_vel_error_array[i][j] = disp_cut[i - mask_x_lower][j - mask_y_lower]
+
+            else:
+
+                masked_vel_error_array[i][j] = masked_vel_error_array[i][j]
+
+    disp_cut = sn_array[mask_x_lower:mask_x_upper,
+                               mask_y_lower:mask_y_upper]
+
+    masked_sn_array = np.nan * np.empty(shape=(xpixs, ypixs))
+
+    for i in range(xpixs):
+
+        for j in range(ypixs):
+
+            if (i >= mask_x_lower and i < mask_x_upper) \
+               and (j >= mask_y_lower and j < mask_y_upper):
+
+                masked_sn_array[i][j] = disp_cut[i - mask_x_lower][j - mask_y_lower]
+
+            else:
+
+                masked_sn_array[i][j] = masked_sn_array[i][j]
+
+    disp_cut = noise_array[mask_x_lower:mask_x_upper,
+                           mask_y_lower:mask_y_upper]
+
+    masked_noise_array = np.nan * np.empty(shape=(xpixs, ypixs))
+
+    for i in range(xpixs):
+
+        for j in range(ypixs):
+
+            if (i >= mask_x_lower and i < mask_x_upper) \
+               and (j >= mask_y_lower and j < mask_y_upper):
+
+                masked_noise_array[i][j] = disp_cut[i - mask_x_lower][j - mask_y_lower]
+
+            else:
+
+                masked_noise_array[i][j] = masked_noise_array[i][j]
+
+    disp_cut = signal_array[mask_x_lower:mask_x_upper,
+                           mask_y_lower:mask_y_upper]
+
+    masked_signal_array = np.nan * np.empty(shape=(xpixs, ypixs))
+
+    for i in range(xpixs):
+
+        for j in range(ypixs):
+
+            if (i >= mask_x_lower and i < mask_x_upper) \
+               and (j >= mask_y_lower and j < mask_y_upper):
+
+                masked_signal_array[i][j] = disp_cut[i - mask_x_lower][j - mask_y_lower]
+
+            else:
+
+                masked_signal_array[i][j] = masked_signal_array[i][j]
+
     im = ax[2].imshow(masked_int_sig_array,
                       vmin=int_sig_min,
                       vmax=int_sig_max,
@@ -1457,7 +1578,7 @@ def vel_field_stott_binning(incube,
     plt.colorbar(im, cax=cax_new)
 
     # set the title
-    ax[2].set_title('[OIII] Dispersion')
+    ax[2].set_title('%s Dispersion' % line)
 
     im = ax[3].imshow(signal_array,
                       vmin=s_min,
@@ -1588,13 +1709,15 @@ def vel_field_stott_binning(incube,
     # return the noise, signal and flux arrays for potential
     # voronoi binning
     
-    return [noise_array[mask_x_lower:mask_x_upper,
-                        mask_y_lower:mask_y_upper],
-            signal_array[mask_x_lower:mask_x_upper,
-                         mask_y_lower:mask_y_upper],
-            flux_array,
+    return [flux_array,
             masked_vel_array,
-            masked_int_sig_array]
+            masked_int_sig_array,
+            signal_array,
+            noise_array,
+            sn_array,
+            measurement_array,
+            masked_vel_error_array,
+            masked_tot_sig_error_array]
 
 def noise_from_mask_poly_subtract(cube_filter,
                                   data,
@@ -2489,7 +2612,7 @@ def noise_from_histogram(wave_array,
 #    plt.close('all')
 
     noise = noise_result.best_values['sigma']
-    return noise
+    return noise, noise_result.best_values['center']
 
 
 def sky_res(sky_flux,
@@ -2737,9 +2860,10 @@ def perturb_value(noise,
 
     return ran_array + flux_array
 
-multi_vel_field_stott('/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/Kband/KLP_K_NAMES.txt',
-                      'ha',
-                      3.0,
-                      g_c_min=0.5,
-                      g_c_max=1.5,
-                      method='median')
+#multi_vel_field_stott('/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/Hband/KLP_H_NAMES_FINAL.txt',
+#                      'oiii',
+#                      3.0,
+#                      g_c_min=0.25,
+#                      g_c_max=1.75,
+#                      method='median',
+#                      ntimes=200)
