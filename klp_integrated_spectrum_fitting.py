@@ -127,7 +127,7 @@ def integrated_spec_extract(datacube,
 
     lower_index = line_idx - 75
     if lower_index < 0:
-        lower_index = 0
+        lower_index = 20
     upper_index = line_idx + 75
 
     # define the x and y shapes
@@ -163,7 +163,7 @@ def integrated_spec_extract(datacube,
     xx,yy = np.indices([x_shape,
                         y_shape], dtype='float')
 
-    radius = ((yy-central_y)**2 + (xx-central_x)**2)**0.5
+    radius = ((yy-central_y-1)**2 + (xx-central_x-1)**2)**0.5
 
     mask = radius <= aperture
 
@@ -193,7 +193,7 @@ def integrated_spec_extract(datacube,
     # testing to make sure the aperture is in the right place
     cont_image = np.nanmedian(cube_data[200:1800,:,:],axis=0)
 #    fig, ax = plt.subplots(1,1,figsize=(8,8))
-    vmin,vmax = np.nanpercentile(cont_image,[10.0, 90.0])
+    vmin,vmax = np.nanpercentile(cont_image[7:x_shape-7,7:y_shape-7],[10.0, 90.0])
 #    ax.imshow(cont_image,
 #              vmin=vmin,
 #              vmax=vmax)

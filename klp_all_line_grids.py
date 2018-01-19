@@ -589,7 +589,7 @@ def multi_vel_field_all_lines(infile_k,
         im = axes[0][5].imshow(oii_cont,
                                cmap=plt.cm.nipy_spectral,
                                vmin=oii_cont_vmin,
-                               vmax=oii_cont_vmin,
+                               vmax=oii_cont_vmax,
                                interpolation='nearest')
 
         # add colourbar to each plot
@@ -674,7 +674,7 @@ def multi_vel_field_all_lines(infile_k,
                            color='black',
                            ls='--',
                            lw=2)
-        for ranges in sky_dict.values():
+        for ranges in yj_sky_dict.values():
             axes[0][7].axvspan(ranges[0],
                                ranges[1],
                                alpha=0.5,
@@ -791,7 +791,7 @@ def multi_vel_field_all_lines(infile_k,
         im = axes[1][5].imshow(hb_cont,
                                cmap=plt.cm.nipy_spectral,
                                vmin=hb_cont_vmin,
-                               vmax=hb_cont_vmin,
+                               vmax=hb_cont_vmax,
                                interpolation='nearest')
 
         # add colourbar to each plot
@@ -855,7 +855,7 @@ def multi_vel_field_all_lines(infile_k,
                            color='black',
                            ls='--',
                            lw=2)
-        for ranges in sky_dict.values():
+        for ranges in h_sky_dict.values():
             axes[1][7].axvspan(ranges[0],
                                ranges[1],
                                alpha=0.5,
@@ -968,7 +968,7 @@ def multi_vel_field_all_lines(infile_k,
         im = axes[2][5].imshow(oiiiweak_cont,
                                cmap=plt.cm.nipy_spectral,
                                vmin=oiiiweak_cont_vmin,
-                               vmax=oiiiweak_cont_vmin,
+                               vmax=oiiiweak_cont_vmax,
                                interpolation='nearest')
 
         # add colourbar to each plot
@@ -1033,7 +1033,7 @@ def multi_vel_field_all_lines(infile_k,
                            color='black',
                            ls='--',
                            lw=2)
-        for ranges in sky_dict.values():
+        for ranges in h_sky_dict.values():
             axes[2][7].axvspan(ranges[0],
                                ranges[1],
                                alpha=0.5,
@@ -1147,7 +1147,7 @@ def multi_vel_field_all_lines(infile_k,
         im = axes[3][5].imshow(oiii_cont,
                                cmap=plt.cm.nipy_spectral,
                                vmin=oiii_cont_vmin,
-                               vmax=oiii_cont_vmin,
+                               vmax=oiii_cont_vmax,
                                interpolation='nearest')
 
         # add colourbar to each plot
@@ -1212,7 +1212,7 @@ def multi_vel_field_all_lines(infile_k,
                            color='black',
                            ls='--',
                            lw=2)
-        for ranges in sky_dict.values():
+        for ranges in h_sky_dict.values():
             axes[3][7].axvspan(ranges[0],
                                ranges[1],
                                alpha=0.5,
@@ -1326,7 +1326,7 @@ def multi_vel_field_all_lines(infile_k,
         im = axes[4][5].imshow(ha_cont,
                                cmap=plt.cm.nipy_spectral,
                                vmin=ha_cont_vmin,
-                               vmax=ha_cont_vmin,
+                               vmax=ha_cont_vmax,
                                interpolation='nearest')
 
         # add colourbar to each plot
@@ -1390,7 +1390,7 @@ def multi_vel_field_all_lines(infile_k,
                            color='black',
                            ls='--',
                            lw=2)
-        for ranges in sky_dict.values():
+        for ranges in k_sky_dict.values():
             axes[4][7].axvspan(ranges[0],
                                ranges[1],
                                alpha=0.5,
@@ -1503,7 +1503,7 @@ def multi_vel_field_all_lines(infile_k,
         im = axes[5][5].imshow(nii_cont,
                                cmap=plt.cm.nipy_spectral,
                                vmin=nii_cont_vmin,
-                               vmax=nii_cont_vmin,
+                               vmax=nii_cont_vmax,
                                interpolation='nearest')
 
         # add colourbar to each plot
@@ -1568,7 +1568,7 @@ def multi_vel_field_all_lines(infile_k,
                            color='black',
                            ls='--',
                            lw=2)
-        for ranges in sky_dict.values():
+        for ranges in k_sky_dict.values():
             axes[5][7].axvspan(ranges[0],
                                ranges[1],
                                alpha=0.5,
