@@ -5,7 +5,6 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-import pyraf
 import numpy.ma as ma
 import pickle
 from scipy.spatial import distance

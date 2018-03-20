@@ -26,7 +26,7 @@ from matplotlib import rc
 from photutils import CircularAperture
 from photutils import EllipticalAperture
 from photutils import aperture_photometry
-from glob import glob
+import glob
 
 # add the class file to the PYTHONPATH
 sys.path.append('/disk2/turner/disk1/turner/PhD'
@@ -35,7 +35,6 @@ sys.path.append('/disk2/turner/disk1/turner/PhD'
 from cubeClass import cubeOps
 
 def make_table(sci_dir,
-               glob_extension,
                names_file,
                star1,
                star2,
@@ -56,13 +55,32 @@ def make_table(sci_dir,
     k3d_redshift = k3d_table['redshift']
 
     # what to search for in glob
-    glob_search = sci_dir + '/COMBINE_SCI_RECONSTRUCTED*_' + glob_extension + '_*.fits'
+    glob_name = sci_dir + '/COMBINE_SCI_RECONSTRUCTED_*.fits'
+
+    glob_list = glob.glob(glob_name)
+
+    clean_obj_list = copy(glob_list)
+
+    clean_obj_list = [x for x in clean_obj_list if "_oiii_" not in x]
+    clean_obj_list = [x for x in clean_obj_list if "_oii_" not in x]
+    clean_obj_list = [x for x in clean_obj_list if "_ha_" not in x]
+    clean_obj_list = [x for x in clean_obj_list if "_hb_" not in x]
+    clean_obj_list = [x for x in clean_obj_list if "_nii_" not in x]
+    clean_obj_list = [x for x in clean_obj_list if "_oiii_weak_" not in x]
+    clean_obj_list = [x for x in clean_obj_list if "_oiiiweak_" not in x]
+    clean_obj_list = [x for x in clean_obj_list if "_error_spectrum.fits" not in x]
+    clean_obj_list = [x for x in clean_obj_list if "_sky.fits" not in x]
+    clean_obj_list = [x for x in clean_obj_list if "_SKY.fits" not in x]
+    clean_obj_list = [x for x in clean_obj_list if ".png" not in x]
+    clean_obj_list = [x for x in clean_obj_list if "_single.fits" not in x]
+    clean_obj_list = [x for x in clean_obj_list if "_C_STARS_" not in x]
+    clean_obj_list = [x for x in clean_obj_list if "_GS4str_" not in x]
 
     # loop over the combined objects in the science directory
     # and do the magic then write out each line to the names_file
     with open(names_file, 'a') as f:
 
-        for entry in glob(glob_search):
+        for entry in clean_obj_list:
 
             print entry
             # find just the galaxy name
@@ -72,7 +90,7 @@ def make_table(sci_dir,
 
             # get the KLP master file index containing the
             # above string and hence the object redshift
-            index = [i for i, s in enumerate(k3d_names) if gal_name in s][0]
+            index = [i for i, s in enumerate(k3d_names) if gal_name in s][0 ]
 
             # now get the IFUNr for the sky frame and the correct
             # standard star
@@ -95,9 +113,8 @@ def make_table(sci_dir,
     f.close()
 
 
-make_table('/disk2/turner/disk2/turner/DATA/KLP/YJ/GP2/goods_p2_comb_calibrated',
-           'GS4',
-           '/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/YJband/KLP_YJ_NAMES.txt',
-           'GS3str_31679',
-           'C_STARS_16422',
-           'C_STARS_20128')
+make_table('/disk2/turner/disk2/turner/DATA/KLP/YJ/GP3_NEW/p3_comb',
+           '/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/YJband/KLP_YJ_GP3_NEW_NAMES.txt',
+           'GS4str_45788',
+           'C_STARS_20128',
+           'C_STARS_23991')

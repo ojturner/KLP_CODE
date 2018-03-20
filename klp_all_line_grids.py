@@ -11,7 +11,6 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
-import pyraf
 import numpy.ma as ma
 import pickle
 from scipy.spatial import distance
@@ -72,6 +71,11 @@ def multi_vel_field_all_lines(infile_k,
                               g_c_min,
                               g_c_max,
                               ntimes=200,
+                              spatial_smooth=False,
+                              spectral_smooth=False,
+                              smoothing_psf=0.3,
+                              spectral_smooth_width=2,
+                              prog='klp',
                               **kwargs):
     
     noise_method = 'mask'
@@ -285,42 +289,48 @@ def multi_vel_field_all_lines(infile_k,
                                                                           central_x__yj,
                                                                           central_y__yj,
                                                                           redshift,
-                                                                          'oii')
+                                                                          'oii',
+                                                                          prog=prog)
 
         # hb
         hb_int_spec, hb_int_wave, hb_cont, hb_cont_vmin, hb_cont_vmax, masks_im = int_spec_fit.integrated_spec_extract(obj_name__h,
                                                                           central_x__h,
                                                                           central_y__h,
                                                                           redshift,
-                                                                          'hb')
+                                                                          'hb',
+                                                                          prog=prog)
 
         # oiiiweak
         oiiiweak_int_spec, oiiiweak_int_wave, oiiiweak_cont, oiiiweak_cont_vmin, oiiiweak_cont_vmax, masks_im = int_spec_fit.integrated_spec_extract(obj_name__h,
                                                                           central_x__h,
                                                                           central_y__h,
                                                                           redshift,
-                                                                          'oiiiweak')
+                                                                          'oiiiweak',
+                                                                          prog=prog)
 
         # oiii
         oiii_int_spec, oiii_int_wave, oiii_cont, oiii_cont_vmin, oiii_cont_vmax, masks_im = int_spec_fit.integrated_spec_extract(obj_name__h,
                                                                           central_x__h,
                                                                           central_y__h,
                                                                           redshift,
-                                                                          'oiii')
+                                                                          'oiii',
+                                                                          prog=prog)
 
         # ha
         ha_int_spec, ha_int_wave, ha_cont, ha_cont_vmin, ha_cont_vmax, masks_im = int_spec_fit.integrated_spec_extract(obj_name__k,
                                                                           central_x__k,
                                                                           central_y__k,
                                                                           redshift,
-                                                                          'ha')
+                                                                          'ha',
+                                                                          prog=prog)
 
         # nii
         nii_int_spec, nii_int_wave, nii_cont, nii_cont_vmin, nii_cont_vmax, masks_im = int_spec_fit.integrated_spec_extract(obj_name__k,
                                                                           central_x__k,
                                                                           central_y__k,
                                                                           redshift,
-                                                                          'nii')                           
+                                                                          'nii',
+                                                                          prog=prog)                           
 
         # one at a time calculate the line maps 
         # and then plot
@@ -338,7 +348,12 @@ def multi_vel_field_all_lines(infile_k,
                                                       tol=tolerance,
                                                       method=stack_method,
                                                       noise_method=noise_method,
-                                                      ntimes=ntimes)
+                                                      ntimes=ntimes,
+                                                      spatial_smooth=spatial_smooth,
+                                                      spectral_smooth=spectral_smooth,
+                                                      smoothing_psf=smoothing_psf,
+                                                      spectral_smooth_width=spectral_smooth_width,
+                                                      prog=prog)
         hb_grid = spaxel_fit.vel_field_stott_binning(obj_name__h,
                                                       sky_cube__h,
                                                       'hb',
@@ -353,7 +368,12 @@ def multi_vel_field_all_lines(infile_k,
                                                       tol=tolerance,
                                                       method=stack_method,
                                                       noise_method=noise_method,
-                                                      ntimes=ntimes)
+                                                      ntimes=ntimes,
+                                                      spatial_smooth=spatial_smooth,
+                                                      spectral_smooth=spectral_smooth,
+                                                      smoothing_psf=smoothing_psf,
+                                                      spectral_smooth_width=spectral_smooth_width,
+                                                      prog=prog)
         oiiiweak_grid = spaxel_fit.vel_field_stott_binning(obj_name__h,
                                                       sky_cube__h,
                                                       'oiiiweak',
@@ -368,7 +388,12 @@ def multi_vel_field_all_lines(infile_k,
                                                       tol=tolerance,
                                                       method=stack_method,
                                                       noise_method=noise_method,
-                                                      ntimes=ntimes)
+                                                      ntimes=ntimes,
+                                                      spatial_smooth=spatial_smooth,
+                                                      spectral_smooth=spectral_smooth,
+                                                      smoothing_psf=smoothing_psf,
+                                                      spectral_smooth_width=spectral_smooth_width,
+                                                      prog=prog)
         oiii_grid = spaxel_fit.vel_field_stott_binning(obj_name__h,
                                                       sky_cube__h,
                                                       'oiii',
@@ -383,7 +408,12 @@ def multi_vel_field_all_lines(infile_k,
                                                       tol=tolerance,
                                                       method=stack_method,
                                                       noise_method=noise_method,
-                                                      ntimes=ntimes)
+                                                      ntimes=ntimes,
+                                                      spatial_smooth=spatial_smooth,
+                                                      spectral_smooth=spectral_smooth,
+                                                      smoothing_psf=smoothing_psf,
+                                                      spectral_smooth_width=spectral_smooth_width,
+                                                      prog=prog)
         ha_grid = spaxel_fit.vel_field_stott_binning(obj_name__k,
                                                       sky_cube__k,
                                                       'ha',
@@ -398,7 +428,12 @@ def multi_vel_field_all_lines(infile_k,
                                                       tol=tolerance,
                                                       method=stack_method,
                                                       noise_method=noise_method,
-                                                      ntimes=ntimes)
+                                                      ntimes=ntimes,
+                                                      spatial_smooth=spatial_smooth,
+                                                      spectral_smooth=spectral_smooth,
+                                                      smoothing_psf=smoothing_psf,
+                                                      spectral_smooth_width=spectral_smooth_width,
+                                                      prog=prog)
         nii_grid = spaxel_fit.vel_field_stott_binning(obj_name__k,
                                                       sky_cube__k,
                                                       'nii',
@@ -413,7 +448,12 @@ def multi_vel_field_all_lines(infile_k,
                                                       tol=tolerance,
                                                       method=stack_method,
                                                       noise_method=noise_method,
-                                                      ntimes=ntimes)
+                                                      ntimes=ntimes,
+                                                      spatial_smooth=spatial_smooth,
+                                                      spectral_smooth=spectral_smooth,
+                                                      smoothing_psf=smoothing_psf,
+                                                      spectral_smooth_width=spectral_smooth_width,
+                                                      prog=prog)
 
         # return the sky lines for plotting over the integrated spectrum
         yj_sky_dict = mask_the_sky.ret_yj_sky()
@@ -1578,7 +1618,7 @@ def multi_vel_field_all_lines(infile_k,
 
         fig.tight_layout()
         # plt.show()
-        save_name = '/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/ALL_LINE_GRIDS/' + gal_name + '.pdf'
+        save_name = '/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/ALL_LINE_GRIDS/blurred_0.2_without_3_sig_mask/' + gal_name + '.pdf'
         fig.savefig(save_name)
         plt.close('all')
 
@@ -1588,5 +1628,10 @@ multi_vel_field_all_lines('/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/Kband/KL
                           3.0,
                           0.25,
                           1.75,
-                          ntimes=200)
+                          ntimes=200,
+                          spatial_smooth=True,
+                          spectral_smooth=False,
+                          smoothing_psf=0.2,
+                          spectral_smooth_width=2,
+                          prog='klp')
 
