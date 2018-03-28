@@ -14,6 +14,7 @@ import matplotlib.cm as cm
 import numpy.ma as ma
 import pickle
 import scipy.ndimage.filters as scifilt
+from astropy.stats import median_absolute_deviation as astmad
 from scipy.spatial import distance
 from scipy import ndimage
 from copy import copy
@@ -62,8 +63,13 @@ def multi_vel_field_stott(infile,
                           g_c_min,
                           g_c_max,
                           ntimes=200,
-                          spatial_smooth=False,
+                          spatial_smooth=True,
+                          spectral_smooth=False,
+                          smoothing_psf=0.2,
+                          spectral_smooth_width=2,
                           prog='klp',
+                          emp_mask=True,
+                          weight_fit=False,
                           **kwargs):
 
     """
@@ -119,11 +125,11 @@ def multi_vel_field_stott(infile,
 
             else:
 
-                tolerance = 60
+                tolerance = 30
 
         except KeyError:
 
-            tolerance = 60
+            tolerance = 30
 
         try:
 
@@ -154,7 +160,13 @@ def multi_vel_field_stott(infile,
                                 method=stack_method,
                                 noise_method=noise_method,
                                 ntimes=ntimes,
-                                prog=prog)
+                                spatial_smooth=spatial_smooth,
+                                spectral_smooth=spectral_smooth,
+                                smoothing_psf=smoothing_psf,
+                                spectral_smooth_width=spectral_smooth_width,
+                                prog=prog,
+                                emp_mask=emp_mask,
+                                weight_fit=weight_fit)
 
 def vel_field_stott_binning(incube,
                             sky_cube,
@@ -175,7 +187,9 @@ def vel_field_stott_binning(incube,
                             spectral_smooth=False,
                             smoothing_psf=0.3,
                             spectral_smooth_width=2,
-                            prog='klp'):
+                            prog='klp',
+                            emp_mask=True,
+                            weight_fit=False):
 
     """
     Def:
@@ -208,17 +222,9 @@ def vel_field_stott_binning(incube,
     # open the data
     cube = cubeOps(incube)
 
-    # define the skyline weights array
-    if cube.filter == 'K':
-        weights_file = incube[:-5] + '_error_spectrum.fits'
-    elif cube.filter == 'H':
-        weights_file = incube[:-5] + '_error_spectrum.fits'
-    elif cube.filter == 'YJ':
-        weights_file = incube[:-5] + '_error_spectrum.fits'
-    else:
-        weights_file = incube[:-5] + '_NONONO_sky.fits'
+    # get the wavelength array
 
-    weights_array = fits.open(weights_file)[0].data
+    wave_array = cubeOps(incube).wave_array
 
     skycube = cubeOps(sky_cube)
 
@@ -263,6 +269,12 @@ def vel_field_stott_binning(incube,
         noise = scifilt.gaussian_filter(noise,
                                         sigma=[spectral_smooth_width,sigma_g,sigma_g])
 
+        # the error spectrum depends sensitively on the smoothing
+        # applied. If we want to smooth both spatially and spectrally
+        # this reduces the noise/weights array massively
+        # define the skyline weights array
+        weights_file = incube[:-5] + '_error_spectrum' + str(smoothing_psf).replace(".", "") + str(spectral_smooth_width) + '.fits'
+
     elif spatial_smooth and not(spectral_smooth):
 
         print '[INFO:  ] smoothing data spatially with %s filter' % smoothing_psf
@@ -299,6 +311,9 @@ def vel_field_stott_binning(incube,
         for entry in nan_list_noise:
             noise[entry[0],entry[1],entry[2]] = np.nan
 
+        # define the weights file
+        weights_file = incube[:-5] + '_error_spectrum' + str(smoothing_psf).replace(".", "") + '.fits'
+
     elif spectral_smooth and not(spatial_smooth):
 
         print '[INFO:  ] smoothing data spectrally with %s filter' % spectral_smooth_width
@@ -322,9 +337,16 @@ def vel_field_stott_binning(incube,
         noise = scifilt.gaussian_filter(noise,
                                         sigma=[spectral_smooth_width,0.0,0.0])
 
+        # define the weights file
+        weights_file = incube[:-5] + '_error_spectrum' + str(spectral_smooth_width) + '.fits'
+
     else:
 
+        weights_file = incube[:-5] + '_error_spectrum.fits' 
+
         print '[INFO:  ] No data smoothing selected'
+
+    weights_array = fits.open(weights_file)[0].data
 
     xpixs = data.shape[1]
 
@@ -399,6 +421,14 @@ def vel_field_stott_binning(incube,
         range_lower = 5
         range_upper = 6
 
+    elif cube.filter == 'YJ':
+
+        lower_t = 8
+        upper_t = 9
+
+        range_lower = 12
+        range_upper = 13
+
     else:
 
         lower_t = 8
@@ -422,10 +452,6 @@ def vel_field_stott_binning(incube,
 #    # now thermal noise subtracted and everything can proceed
 #    # as before - or alternatively can get rid of this step again
 
-    # get the wavelength array
-
-    wave_array = cubeOps(incube).wave_array
-
     if line == 'oiii':
 
         central_wl = 0.500824 * (1. + redshift)
@@ -440,7 +466,7 @@ def vel_field_stott_binning(incube,
 
     elif line == 'oii':
 
-        central_wl = 0.3728485 * (1. + redshift)
+        central_wl = 0.3727485 * (1. + redshift)
 
     elif line == 'ha':
 
@@ -451,7 +477,7 @@ def vel_field_stott_binning(incube,
         central_wl = 0.658527 * (1. + redshift)
 
     # find the index of the chosen emission line
-    line_idx = np.argmin(np.abs(wave_array - central_wl))
+    line_idx = np.nanargmin(np.abs(wave_array - central_wl))
 
     # the shape of the data is (spectrum, xpixel, ypixel)
     # loop through each x and y pixel and get the OIII5007 S/N
@@ -479,8 +505,122 @@ def vel_field_stott_binning(incube,
 
     # rejection array to help identify why a spaxel got rejected
     # 0 = nan signal
+    # 1 = accepted signal without binning
+    # 1.3 = accepted signal 3x3 binning
+    # 1.5 = accepted signal 5x5 binning
+    # 2 = S/N < 0
+    # 3 = S/N < T && S/G && Err
+    # 4 = S/N < T && S/G
+    # 5 = S/N < T # most common until we sort out binning effect
+    # 6 = S/G
+    # 7 = Err
+    # 8 = S/G && Err
+    # 9 = S/N && Err
+    # 10 = unknown
+    # 11 = even more unknown
+
     rejection_array = np.empty(shape=(xpixs, ypixs))
 
+    # empirically mask the skylines
+    # want to do this to increase S/N and
+    # get rid of really bad skyline regions
+
+    if emp_mask:
+
+        print '[INFO:] Masking skylines empirically'
+
+        # figure out which spectral pixels should be masked
+        # across the cube on the basis on the median noise spectrum
+        indices = empirically_mask_skylines(data,
+                                            mask_x_lower,
+                                            mask_x_upper,
+                                            mask_y_lower,
+                                            mask_y_upper)
+
+        # and mask these points identified as crap
+        for i in range(0,data.shape[1]):
+            for j in range(0,data.shape[2]):
+                data[:,i,j][indices] = np.nan
+                noise[:,i,j][indices] = np.nan
+
+    #####################################################
+    #####################################################
+    ########MEDIAN NOISE AND REDUCTION FACTORS###########
+    #####################################################
+    #####################################################
+    print '[INFO:] CALCULATING NOISE PROPERTIES'
+    # define the ranges for this experiment
+    if line_idx < 250:
+        noise_ranges = [[line_idx - 12,line_idx + 13],
+                        [line_idx + 13,line_idx + 38],
+                        [line_idx + 38,line_idx + 63],
+                        [line_idx + 63,line_idx + 88],
+                        [line_idx + 88,line_idx + 103],
+                        [line_idx + 103,line_idx + 128],
+                        [line_idx + 128,line_idx + 153]]
+
+    elif line_idx > 1750:
+        noise_ranges = [[line_idx - 153,line_idx - 128],
+                        [line_idx - 128,line_idx - 103],
+                        [line_idx - 103,line_idx - 88],
+                        [line_idx - 88,line_idx - 63],
+                        [line_idx - 63,line_idx - 38],
+                        [line_idx - 38,line_idx - 13],
+                        [line_idx - 13,line_idx + 12]]
+
+    else:
+        noise_ranges = [[line_idx - 88,line_idx - 63],
+                        [line_idx - 63,line_idx - 38],
+                        [line_idx - 38,line_idx - 13],
+                        [line_idx - 103,line_idx + 12],
+                        [line_idx + 12,line_idx + 37],
+                        [line_idx + 37,line_idx + 62],
+                        [line_idx + 62,line_idx + 87]]
+
+    # compute the binned noise cubes
+    three_binned_data = bin_three_for_noise(data)
+    five_binned_data = bin_five_for_noise(data)
+
+    # define the arrays to house the unbinned,3binned and 5binned noises
+    unbinned_noise_list = []
+    three_binned_noise_list = []
+    five_binned_noise_list = []
+
+    for entry in noise_ranges:
+        unbinned_line_noise, unbinned_line_p_noise = noise_from_mask(data,
+                                                                     entry[0],
+                                                                     entry[1],
+                                                                     mask_x_lower,
+                                                                     mask_x_upper,
+                                                                     mask_y_lower,
+                                                                     mask_y_upper)
+        unbinned_noise_list.append(unbinned_line_noise)
+        three_binned_line_noise, three_binned_line_p_noise = noise_from_mask(three_binned_data,
+                                                                             entry[0],
+                                                                             entry[1],
+                                                                             mask_x_lower,
+                                                                             mask_x_upper,
+                                                                             mask_y_lower,
+                                                                             mask_y_upper)
+        three_binned_noise_list.append(three_binned_line_noise)
+        five_binned_line_noise, five_binned_line_p_noise = noise_from_mask(five_binned_data,
+                                                                           entry[0],
+                                                                           entry[1],
+                                                                           mask_x_lower,
+                                                                           mask_x_upper,
+                                                                           mask_y_lower,
+                                                                           mask_y_upper)
+        five_binned_noise_list.append(five_binned_line_noise)
+
+    # what's the median noise for this cube?
+    print 'MEDIAN NOISE LEVEL: %s' % np.nanmedian(unbinned_noise_list)
+    # now find tred and fred
+    three_noise_ratio = np.array(unbinned_noise_list)/np.array(three_binned_noise_list)
+    t_red = np.nanmax(three_noise_ratio)
+    print 'MEDIAN THREE REDUCTION: %s' % (t_red)
+    five_noise_ratio = np.array(unbinned_noise_list)/np.array(five_binned_noise_list)
+    f_red = np.nanmax(five_noise_ratio)
+    print 'MEDIAN FIVE REDUCTION: %s' % (f_red)
 
     for i in range(0, xpixs, 1):
 
@@ -530,6 +670,7 @@ def vel_field_stott_binning(incube,
                                                                  redshift,
                                                                  cube.filter,
                                                                  prog)
+
             # just assume flat continuum for now
             spaxel_spec = spaxel_spec - (noise_centre*spaxel_median_flux)
             spaxel_median_flux = abs(np.nanmedian(spaxel_spec[350:1500]))
@@ -559,13 +700,17 @@ def vel_field_stott_binning(incube,
             weights_array_norm = weights_array / spaxel_median_flux
             spaxel_spec = spaxel_spec/spaxel_median_flux
             spaxel_noise = noise[:, i, j]/spaxel_median_flux
-
             # first search for the linepeak, which may be different
             # to that specified by the systemic redshift
             # set the upper and lower ranges for the t_index search
+            # need this try/except statement just in case everything
+            # is nan
 
-            t_index = np.argmax(spaxel_spec[line_idx - lower_t:
-                                            line_idx + upper_t])
+            try:
+                t_index = np.nanargmax(spaxel_spec[line_idx - lower_t:
+                                                   line_idx + upper_t])
+            except ValueError:
+                t_index = 10
 
             # need this to be an absolute index
             t_index = t_index + line_idx - lower_t
@@ -592,29 +737,68 @@ def vel_field_stott_binning(incube,
 #                                                                  line_idx,
 #                                                                  cube.filter)
 
+            # define the reduced weights arrays
+            unbinned_weights_array_norm = weights_array_norm[lower_limit: upper_limit]
+            t_red_weights_array_norm = weights_array_norm[lower_limit: upper_limit]/t_red
+            f_red_weights_array_norm = weights_array_norm[lower_limit: upper_limit]/f_red
+
+            # and the fitting wavelength
+            fit_wave_array = wave_array[lower_limit: upper_limit]
+
+            # and the fit spaxel spec
+            fit_spectrum_array = spaxel_spec[lower_limit: upper_limit]
+
+            # multiply the line counts by the cube wavelength separation
             line_counts = line_counts * cube.dL
 
             # do the gaussian fitting
 
             plt.close('all')
 
-            try:
+            # fit the oii line with a double gaussian if this
+            # is what is being considered
 
+            if line == 'oii':
 
-                gauss_values, covar = gauss_fit(wave_array[lower_limit: upper_limit],
-                                                spaxel_spec[lower_limit: upper_limit],
-                                                weights_array_norm[lower_limit: upper_limit],
-                                                central_wl)
+                try:
 
-            except TypeError:
+                    gauss_values, covar = oii_gauss_fit(fit_wave_array,
+                                                        fit_spectrum_array,
+                                                        redshift,
+                                                        unbinned_weights_array_norm,
+                                                        central_wl,
+                                                        weight_fit)
 
-                gauss_values = {'amplitude': np.nan,
-                                'sigma': np.nan,
-                                'center': np.nan}
+                except TypeError:
 
-                covar = np.zeros(shape=(3, 3))
+                    gauss_values = {'amplitude': np.nan,
+                                    'sigma': np.nan,
+                                    'center': np.nan}
 
-                covar = covar * np.nan
+                    covar = np.zeros(shape=(3, 3))
+
+                    covar = covar * np.nan
+
+            else:
+
+                try:
+
+                    gauss_values, covar = gauss_fit(fit_wave_array,
+                                                    fit_spectrum_array,
+                                                    unbinned_weights_array_norm,
+                                                    central_wl,
+                                                    weight_fit)
+
+                except TypeError:
+
+                    gauss_values = {'amplitude': np.nan,
+                                    'sigma': np.nan,
+                                    'center': np.nan}
+
+                    covar = np.zeros(shape=(3, 3))
+
+                    covar = covar * np.nan
+
 
             # define the ratio of line counts to the gaussian fitting flux
 
@@ -686,33 +870,33 @@ def vel_field_stott_binning(incube,
 
                 raise ValueError('Please provide valid noise method')
 
-            # print 'NOISE COMPARISON %s %s %s' % (line_noise,line_p_noise,noise_from_hist)
+            # print 'NOISE COMPARISON %s %s' % (line_noise*spaxel_median_flux,line_p_noise*spaxel_median_flux)
 
             # find the noise reduction factors of the binning methods
             # these feed into the binning_three and binning_five
             # methods to figure out what the new noise should be
 
-            t_red = compute_noise_reduction_factor_three(data,
-                                                         xpixs,
-                                                         ypixs,
-                                                         lower_limit,
-                                                         upper_limit)
-
-            print '3 noise reduction factor: %s' % t_red
-
-            f_red = compute_noise_reduction_factor_five(data,
-                                                        xpixs,
-                                                        ypixs,
-                                                        lower_limit,
-                                                        upper_limit)
-
-            print '5 noise reduction factor: %s' % f_red
+            # get the three binned and five binned cubes for
+            # new noise calculation for this spaxel
+#            t_red = compute_noise_reduction_factor_three(data,
+#                                                         xpixs,
+#                                                         ypixs,
+#                                                         lower_limit,
+#                                                         upper_limit)
+#            print '3 noise reduction factor: %s' % (t_red)
+#            f_red = compute_noise_reduction_factor_five(data,
+#                                                        xpixs,
+#                                                        ypixs,
+#                                                        lower_limit,
+#                                                        upper_limit)
+#            print '5 noise reduction factor: %s' % (f_red)
 
             #print 'REDUCTION FACTORS %s %s' % (t_red,f_red)
 
             # this must also be multiplied by the spectral resolution
             # print 'This is the original line noise: %s' % line_p_noise
 
+            # multiply line noise by the wavelength separation
             line_noise = line_noise * cube.dL
 #            noise_from_masked_method = noise_from_masked_method * cube.dL
 
@@ -739,6 +923,7 @@ def vel_field_stott_binning(incube,
             # above calculations
 
             line_sn = line_counts / line_noise
+            sn_array[i, j] = line_sn
 
             #print 'THIS IS THE SIGNAL TO NOISE: %s %s %s' % (line_sn,line_counts,line_noise)
 
@@ -750,7 +935,6 @@ def vel_field_stott_binning(incube,
 
                 # we've got a nan entry - get rid of it
 
-                sn_array[i, j] = np.nan
                 vel_array[i, j] = np.nan
                 disp_array[i, j] = np.nan
                 flux_array[i, j] = np.nan
@@ -799,16 +983,25 @@ def vel_field_stott_binning(incube,
                     # print 'fitting %sth gaussian' % loop
 
                     # get the perturbed array using the helper function
-                    new_flux = perturb_value(line_p_noise,
-                                             spaxel_spec[lower_limit:
-                                                         upper_limit])
+                    new_flux = perturb_value(unbinned_weights_array_norm,
+                                             fit_spectrum_array)
 
-                    # fit the gaussian to recover the parameters
-                    gauss_values, covar = gauss_fit(wave_array[lower_limit:
-                                                               upper_limit],
-                                                    new_flux,
-                                                    weights_array_norm[lower_limit:upper_limit],
-                                                    central_wl)
+                    if line == 'oii':
+
+                        # fit the gaussian to recover the parameters
+                        gauss_values, covar = oii_gauss_fit(fit_wave_array,
+                                                            new_flux,
+                                                            redshift,
+                                                            unbinned_weights_array_norm,
+                                                            central_wl,
+                                                            weight_fit)
+                    else:
+                        # fit the gaussian to recover the parameters
+                        gauss_values, covar = gauss_fit(fit_wave_array,
+                                                        new_flux,
+                                                        unbinned_weights_array_norm,
+                                                        central_wl,
+                                                        weight_fit)
 
                     # plt.show()
 
@@ -838,7 +1031,7 @@ def vel_field_stott_binning(incube,
                         mc_amp_array.append(gauss_values['amplitude'])
                         mc_centre_array.append(gauss_values['center'])
 
-                # print 'This is how many survived %s' % len(mc_sig_array)
+                print 'This is how many survived %s' % len(mc_sig_array)
                 # np array the resultant mc arrays
 
                 mc_sig_array = np.array(mc_sig_array)
@@ -879,14 +1072,13 @@ def vel_field_stott_binning(incube,
                 amp_gauss_values, amp_covar = mc_gauss_fit(amp_edges[:-1],
                                                              amp_hist)
 
-                sn_array[i, j] = line_sn
                 rejection_array[i, j] = 1
                 vel_array[i, j] = vel_gauss_values['center']
 
                 # sometimes getting bung values for the width of
                 # the emission lines
 
-                if sig_gauss_values['center'] > 0 and sig_gauss_values['center'] < 1000:
+                if sig_gauss_values['center'] > 0 and sig_gauss_values['center'] < 3000:
 
                     disp_array[i, j] = sig_gauss_values['center']
 
@@ -903,8 +1095,6 @@ def vel_field_stott_binning(incube,
             elif line_sn < 0:
 
                 # print 'Found negative signal %s %s' % (i, j)
-
-                sn_array[i, j] = np.nan
                 vel_array[i, j] = np.nan
                 disp_array[i, j] = np.nan
                 flux_array[i, j] = np.nan
@@ -965,10 +1155,20 @@ def vel_field_stott_binning(incube,
                 # and the line_counts
                 plt.close('all')
 
-                gauss_values, covar = gauss_fit(wave_array[lower_limit: upper_limit],
-                                                spec,
-                                                weights_array_norm[lower_limit:upper_limit],
-                                                central_wl)
+                if line == 'oii':
+
+                    gauss_values, covar = oii_gauss_fit(wave_array[lower_limit: upper_limit],
+                                                        spec,
+                                                        redshift,
+                                                        t_red_weights_array_norm,
+                                                        central_wl,
+                                                        weight_fit)
+                else:
+                    gauss_values, covar = gauss_fit(wave_array[lower_limit: upper_limit],
+                                                    spec,
+                                                    t_red_weights_array_norm,
+                                                    central_wl,
+                                                    weight_fit)
 
                 try:
 
@@ -1021,15 +1221,25 @@ def vel_field_stott_binning(incube,
                         # print 'fitting %sth gaussian' % loop
 
                         # get the perturbed array using the helper function
-                        new_flux = perturb_value(new_line_p_noise,
+                        new_flux = perturb_value(t_red_weights_array_norm,
                                                  spec)
 
-                        # fit the gaussian to recover the parameters
-                        gauss_values, covar = gauss_fit(wave_array[lower_limit:
-                                                                   upper_limit],
-                                                        new_flux,
-                                                        weights_array_norm[lower_limit:upper_limit],
-                                                        central_wl)
+                        if line == 'oii':
+
+                            # fit the gaussian to recover the parameters
+                            gauss_values, covar = oii_gauss_fit(fit_wave_array,
+                                                                new_flux,
+                                                                redshift,
+                                                                t_red_weights_array_norm,
+                                                                central_wl,
+                                                                weight_fit)
+                        else:
+                            # fit the gaussian to recover the parameters
+                            gauss_values, covar = gauss_fit(fit_wave_array,
+                                                            new_flux,
+                                                            t_red_weights_array_norm,
+                                                            central_wl,
+                                                            weight_fit)
 
                         # plt.show()
 
@@ -1107,8 +1317,8 @@ def vel_field_stott_binning(incube,
                                                                  amp_hist)
 
                     # append the original line-sn rather than the binned sn
-                    sn_array[i, j] = line_sn
-                    rejection_array[i, j] = 1
+                    sn_array[i, j] = new_sn
+                    rejection_array[i, j] = 1.3
                     vel_array[i, j] = vel_gauss_values['center']
 
                     if sig_gauss_values['center'] > 0 and sig_gauss_values['center'] < 3000:
@@ -1129,7 +1339,6 @@ def vel_field_stott_binning(incube,
 
                     # print 'Found negative signal %s %s' % (i, j)
 
-                    sn_array[i, j] = np.nan
                     vel_array[i, j] = np.nan
                     disp_array[i, j] = np.nan
                     flux_array[i, j] = np.nan
@@ -1185,10 +1394,21 @@ def vel_field_stott_binning(incube,
 
                     plt.close('all')
 
-                    gauss_values, covar = gauss_fit(wave_array[lower_limit: upper_limit],
-                                                    spec,
-                                                    weights_array_norm[lower_limit:upper_limit],
-                                                    central_wl)
+                    if line == 'oii':
+
+                        gauss_values, covar = oii_gauss_fit(fit_wave_array,
+                                                            spec,
+                                                            redshift,
+                                                            f_red_weights_array_norm,
+                                                            central_wl,
+                                                            weight_fit)
+                    else:
+
+                        gauss_values, covar = gauss_fit(fit_wave_array,
+                                                        spec,
+                                                        f_red_weights_array_norm,
+                                                        central_wl,
+                                                        weight_fit)
 
                     try:
 
@@ -1223,9 +1443,6 @@ def vel_field_stott_binning(incube,
                         # add to the signal to noise array
 
                         # print 'CRITERIA SATISFIED AFTER 5x5 binning %s %s %s %s %s %s' % (i, j, final_sn, int_ratio, gauss_values['center'], gauss_values['sigma'])
-
-                        sn_array[i, j] = final_sn
-
                         # plt.show()
 
                         mc_sig_array = []
@@ -1244,17 +1461,27 @@ def vel_field_stott_binning(incube,
                             # print 'fitting %sth gaussian' % loop
 
                             # get the perturbed array using the helper function
-                            new_flux = perturb_value(final_line_p_noise,
+                            new_flux = perturb_value(f_red_weights_array_norm,
                                                      spec)
 
-                            # print new_flux
+                            if line == 'oii':
 
-                            # fit the gaussian to recover the parameters
-                            gauss_values, covar = gauss_fit(wave_array[lower_limit:
-                                                                       upper_limit],
-                                                            new_flux,
-                                                            weights_array_norm[lower_limit:upper_limit],
-                                                            central_wl)
+                                # fit the gaussian to recover the parameters
+                                gauss_values, covar = oii_gauss_fit(fit_wave_array,
+                                                                    new_flux,
+                                                                    redshift,
+                                                                    f_red_weights_array_norm,
+                                                                    central_wl,
+                                                                    weight_fit)
+
+                            else:
+
+                                # fit the gaussian to recover the parameters
+                                gauss_values, covar = gauss_fit(fit_wave_array,
+                                                                new_flux,
+                                                                f_red_weights_array_norm,
+                                                                central_wl,
+                                                                weight_fit)
 
                             # plt.show()
 
@@ -1325,8 +1552,8 @@ def vel_field_stott_binning(incube,
                         amp_gauss_values, amp_covar = mc_gauss_fit(amp_edges[:-1],
                                                                      amp_hist)
 
-                        sn_array[i, j] = line_sn
-                        rejection_array[i, j] = 1
+                        sn_array[i, j] = final_sn
+                        rejection_array[i, j] = 1.5
                         vel_array[i, j] = vel_gauss_values['center']
 
                         if sig_gauss_values['center'] > 0 and sig_gauss_values['center'] < 3000:
@@ -1347,7 +1574,6 @@ def vel_field_stott_binning(incube,
 
                         # print 'Threshold reached but sum and gauss too disimilar'
                     
-                        sn_array[i, j] = np.nan
                         vel_array[i, j] = np.nan
                         disp_array[i, j] = np.nan
                         flux_array[i, j] = np.nan
@@ -1392,7 +1618,6 @@ def vel_field_stott_binning(incube,
 
                         # print 'no improvement, stop trying to fix'
 
-                        sn_array[i, j] = np.nan
                         vel_array[i, j] = np.nan
                         disp_array[i, j] = np.nan
                         flux_array[i, j] = np.nan
@@ -1904,6 +2129,18 @@ def vel_field_stott_binning(incube,
                                                      line),
                           clobber=True)
 
+    sum_gauss_hdu = fits.PrimaryHDU(measurement_array)
+
+    sum_gauss_hdu.writeto('%s_%s_sum_gauss_field.fits'  % (incube[:-5],
+                                                           line),
+                          clobber=True)
+
+    sn_hdu = fits.PrimaryHDU(sn_array)
+
+    sn_hdu.writeto('%s_%s_sn_field.fits'  % (incube[:-5],
+                                             line),
+                    clobber=True)
+
     # return the noise, signal and flux arrays for potential
     # voronoi binning
     
@@ -1916,6 +2153,52 @@ def vel_field_stott_binning(incube,
             measurement_array,
             masked_vel_error_array,
             masked_tot_sig_error_array]
+
+def bin_three_for_noise(data):
+
+    """
+    Def:
+    method to compute the noise after binning 3x3. Create a 3x3 binned
+    entire cube and then compute the noise in the exact same way as
+    in the standard case and compare. See whether this is better than the
+    current compute noise reduction factor method!
+    """
+    three_binned_data = copy(data)
+    for i in range(7, data.shape[1]-7):
+        for j in range(7, data.shape[2]-7):
+            stack_array = []
+            # median stack the spectra 
+            for a in range(i - 1, i + 2):
+                for b in range(j - 1, j + 2):
+                    stack_array.append(data[:, a, b])
+
+            spec = np.nanmedian(stack_array, axis=0)
+            three_binned_data[:,i,j] = spec
+
+    return three_binned_data
+
+def bin_five_for_noise(data):
+
+    """
+    Def:
+    method to compute the noise after binning 3x3. Create a 3x3 binned
+    entire cube and then compute the noise in the exact same way as
+    in the standard case and compare. See whether this is better than the
+    current compute noise reduction factor method!
+    """
+    five_binned_data = copy(data)
+    for i in range(7, data.shape[1]-7):
+        for j in range(7, data.shape[2]-7):
+            stack_array = []
+            # median stack the spectra 
+            for a in range(i - 2, i + 3):
+                for b in range(j - 2, j + 3):
+                    stack_array.append(data[:, a, b])
+
+            spec = np.nanmedian(stack_array, axis=0)
+            five_binned_data[:,i,j] = spec
+
+    return five_binned_data
 
 def noise_from_mask_poly_subtract(cube_filter,
                                   data,
@@ -2031,6 +2314,82 @@ def noise_from_mask_poly_subtract(cube_filter,
 
     return poly_best
 
+def empirically_mask_skylines(data,
+                              mask_x_lower,
+                              mask_x_upper,
+                              mask_y_lower,
+                              mask_y_upper):
+
+    """
+    Def:
+    *Helper function for the vel_field_mask_noise method*
+    Compute the noise level in a datacube by examining the pixels which
+    are not contaminated by the object - using exactly the same wavelength
+    pixels which were used to look at the [OIII] flux.
+
+    Input:
+            data - full datacube from stacked object
+            lower_l - lower wavelength limit
+            upper_l - upper wavelength limit
+            mask_x_lower - lower spatial dimension in x-direction
+            mask_x_upper - upper spatial dimension in x-direction
+            mask_y_lower - lower spatial dimension in y-direction
+            mask_y_upper - upper spatial dimension in y direction
+
+    Output:
+            noise - single value, which is the noise for the spaxel
+                    in consideration in the vel_field_mask_noise method
+
+    """
+    # create list to house the data from the unmasked pixels
+
+    noise_list = []
+
+
+    # loop round and append to this list
+    # four different mask segments to append
+
+    for i in range(7, mask_x_lower + 1):
+
+        for j in range(7, data.shape[2] - 7):
+
+            noise_list.append(data[:, i, j])
+
+    for i in range(mask_x_upper, data.shape[1] - 7):
+
+        for j in range(7, data.shape[2] - 7):
+
+            noise_list.append(data[:, i, j])
+
+    for i in range(mask_x_lower, mask_x_upper + 1):
+
+        for j in range(7, mask_y_lower + 1):
+
+            noise_list.append(data[:, i, j])
+
+    for i in range(mask_x_lower, mask_x_upper + 1):
+
+        for j in range(mask_y_upper, data.shape[2] - 7):
+
+            noise_list.append(data[:, i, j])
+
+    # now get a single spectrum by median stacking everything in this
+    # noise list
+
+    median_noise_spec = np.nanmedian(noise_list, axis=0)
+#    fig, ax = plt.subplots(1, 1, figsize=(14,8))
+#    wave = np.arange(0,len(median_noise_spec))
+#    ax.plot(wave,median_noise_spec)
+    stand_dev = astmad(median_noise_spec[100:1800],ignore_nan=True)
+    indices = np.logical_or(median_noise_spec > 5*stand_dev, median_noise_spec < -5*stand_dev)
+#    median_noise_spec[indices] = np.nan
+#    ax.plot(wave,median_noise_spec,color='red',lw=2)
+#    plt.show()
+#    plt.close('all')
+
+    return indices
+
+
 def noise_from_mask(data,
                     lower_l,
                     upper_l,
@@ -2099,7 +2458,7 @@ def noise_from_mask(data,
     for entry in noise_list:
 
         noise_values.append(np.nansum(entry[lower_l:upper_l]))
-        p_noise_values.append(np.nanstd(entry[lower_l:upper_l]))
+        p_noise_values.append(astmad(entry[lower_l:upper_l],ignore_nan=True))
 
     noise_values = np.array(noise_values)
 
@@ -2117,8 +2476,8 @@ def noise_from_mask(data,
 
     # what to do with these independent noise estimates?
     # will take the median for now but could also take the dispersion
-
-    final_noise = np.nanstd(noise_values)
+    #print 'NOISE VALUES: %s' % np.sort(noise_values)
+    final_noise = astmad(noise_values,ignore_nan=True)
     final_p_noise = np.nanmedian(p_noise_values)
 
     return final_noise, final_p_noise
@@ -2656,7 +3015,8 @@ def ped_gauss_fit(fit_wl, fit_flux):
 def gauss_fit(fit_wl,
               fit_flux,
               weights,
-              central_wl):
+              central_wl,
+              weight_fit):
 
     """
     Def:
@@ -2680,10 +3040,25 @@ def gauss_fit(fit_wl,
 
     pars = gmod.guess(fit_flux, x=fit_wl)
 
-    # perform the fit
-    out = gmod.fit(fit_flux,
-                   pars,
-                   x=fit_wl)
+    if weight_fit:
+        # perform the fit
+        out = gmod.fit(fit_flux,
+                       pars,
+                       x=fit_wl,
+                       weights=(1/weights)**2)
+#        print out.fit_report()
+#        res_plot = out.plot()
+#        plt.show(res_plot)
+#        plt.close(res_plot)
+    else:
+        # perform the fit
+        out = gmod.fit(fit_flux,
+                       pars,
+                       x=fit_wl)
+#        print out.fit_report()
+#        res_plot = out.plot()
+#        plt.show(res_plot)
+#        plt.close(res_plot)
 
 #    fig = out.plot()
 #    plt.show(fig)
@@ -2701,6 +3076,93 @@ def gauss_fit(fit_wl,
 #    plt.close('all')
 
     return out.best_values, out.covar
+
+def oii_gauss_fit(fit_wl,
+                  fit_flux,
+                  redshift,
+                  weights,
+                  central_wl,
+                  weight_fit):
+
+    # define the line wavelengths
+    oii_3727_rest = 0.3727092
+    oii_3727_shifted = (1 + redshift) * oii_3727_rest
+
+    # note we'll use an expression to define the position of this
+    # rather than defining minimum and max and shifted
+    oii_3729_rest = 0.3729875
+    oii_3729_shifted = (1 + redshift) * oii_3729_rest
+
+    # separation between the two
+    delta_oii = oii_3729_rest - oii_3727_rest
+
+    gmod = GaussianModel()
+
+    pars = gmod.guess(fit_flux, x=fit_wl)
+
+    sig_guess = pars.valuesdict()['sigma']
+    amp_guess = pars.valuesdict()['amplitude']
+
+    # construct a composite gaussian model with prefix parameter names
+    comp_mod = GaussianModel(missing='drop',
+                             prefix='oiil_') + \
+               GaussianModel(missing='drop',
+                             prefix='oiih_')
+    # set the wavelength value with min and max range
+    # and initialise the other parameters
+
+    comp_mod.set_param_hint('oiil_center',
+                            value=oii_3727_shifted)
+    comp_mod.set_param_hint('oiih_center',
+                            value=oii_3729_shifted,
+                            expr='((%.6f)*%.6f) + oiil_center' % (1.+redshift,delta_oii))
+    comp_mod.set_param_hint('oiil_amplitude',
+                            value=amp_guess)
+    comp_mod.set_param_hint('oiih_amplitude',
+                            value=amp_guess,
+                            expr='1.*oiil_amplitude')
+    comp_mod.set_param_hint('oiil_sigma',
+                            value=sig_guess)
+    comp_mod.set_param_hint('oiih_sigma',
+                            value=sig_guess,
+                            expr='1.*oiil_sigma')
+
+    pars = comp_mod.make_params()
+
+    if weight_fit:
+        # perform the fit
+        out = comp_mod.fit(fit_flux,
+                           pars,
+                           x=fit_wl,
+                           weights=(1/weights)**2)
+#        print out.fit_report()
+#        res_plot = out.plot()
+#        plt.show(res_plot)
+#        plt.close(res_plot)
+    else:
+        # perform the fit
+        out = comp_mod.fit(fit_flux,
+                           pars,
+                           x=fit_wl)
+#        print out.fit_report()
+#        res_plot = out.plot()
+#        plt.show(res_plot)
+#        plt.close(res_plot)
+
+    # now try to salvage the best values dictionary
+
+    gauss_values = {'amplitude': out.best_values['oiil_amplitude'] + out.best_values['oiih_amplitude'],
+                    'sigma': out.best_values['oiil_sigma'],
+                    'center': (out.best_values['oiil_center'] + out.best_values['oiih_center'])/2.0 }
+
+    new_covar = copy(out.covar)
+    try:
+        new_covar[0][0] = out.covar[2][2]
+        new_covar[1][1] = out.covar[0][0]
+        new_covar[2][2] = out.covar[1][1]
+        return gauss_values, new_covar
+    except TypeError:
+        return gauss_values, new_covar
 
 def noise_from_masked_spectrum(wave_array,
                                spec,
@@ -2799,13 +3261,14 @@ def noise_from_histogram(wave_array,
     # recover the compressed spectrum
 
     compressed_spec = sky_and_emission_line_masked_spec[100:1700].compressed()
+    compressed_spec = compressed_spec[np.logical_or(compressed_spec >=0,compressed_spec<0)]
 
     # take only the 5th to 95th percentile
     compressed_spec = np.sort(compressed_spec)
     compressed_spec = compressed_spec[int(len(compressed_spec)/20.0):int(0.95*len(compressed_spec))]
 
     bins, centres = np.histogram(compressed_spec, bins=20)
-    noise_mod = GaussianModel()
+    noise_mod = GaussianModel(missing='drop')
     noise_pars = noise_mod.guess(bins, x=centres[:-1])
     noise_result = noise_mod.fit(bins, params=noise_pars, x=centres[:-1])
 
@@ -2945,7 +3408,7 @@ def mask_emission_lines(wave_array,
 
             oii_rest = 0.37284835
             oii_shifted = (1 + redshift) * oii_rest
-            oii_shifted_index = np.argmin(np.abs(wave_array - oii_shifted))
+            oii_shifted_index = np.nanargmin(np.abs(wave_array - oii_shifted))
             oii_shifted_min = wave_array[oii_shifted_index-20]
             oii_shifted_max = wave_array[oii_shifted_index+20]
             #print 'YJ-band emission lines to mask'
@@ -2966,17 +3429,17 @@ def mask_emission_lines(wave_array,
 
             h_beta_rest = 0.4862721
             h_beta_shifted = (1 + redshift) * h_beta_rest
-            h_beta_shifted_index = np.argmin(np.abs(wave_array - h_beta_shifted))
+            h_beta_shifted_index = np.nanargmin(np.abs(wave_array - h_beta_shifted))
             h_beta_shifted_min = wave_array[h_beta_shifted_index-20]
             h_beta_shifted_max = wave_array[h_beta_shifted_index+20]
             oiii_4960_rest = 0.4960295
             oiii_4960_shifted = (1 + redshift) * oiii_4960_rest
-            oiii_4960_shifted_index = np.argmin(np.abs(wave_array - oiii_4960_shifted))
+            oiii_4960_shifted_index = np.nanargmin(np.abs(wave_array - oiii_4960_shifted))
             oiii_4960_shifted_min = wave_array[oiii_4960_shifted_index-20]
             oiii_4960_shifted_max = wave_array[oiii_4960_shifted_index+20]
             oiii_5008_rest = 0.5008239
             oiii_5008_shifted = (1 + redshift) * oiii_5008_rest
-            oiii_5008_shifted_index = np.argmin(np.abs(wave_array - oiii_5008_shifted))
+            oiii_5008_shifted_index = np.nanargmin(np.abs(wave_array - oiii_5008_shifted))
             oiii_5008_shifted_min = wave_array[oiii_5008_shifted_index-20]
             oiii_5008_shifted_max = wave_array[oiii_5008_shifted_index+20]
             #print 'H-band emission lines to mask'
@@ -3001,22 +3464,22 @@ def mask_emission_lines(wave_array,
 
             h_alpha_rest = 0.6564614
             h_alpha_shifted = (1 + redshift) * h_alpha_rest
-            h_alpha_shifted_index = np.argmin(np.abs(wave_array - h_alpha_shifted))
+            h_alpha_shifted_index = np.nanargmin(np.abs(wave_array - h_alpha_shifted))
             h_alpha_shifted_min = wave_array[h_alpha_shifted_index-20]
             h_alpha_shifted_max = wave_array[h_alpha_shifted_index+20]
             nii_rest = 0.658523
             nii_shifted = (1 + redshift) * nii_rest
-            nii_shifted_index = np.argmin(np.abs(wave_array - nii_shifted))
+            nii_shifted_index = np.nanargmin(np.abs(wave_array - nii_shifted))
             nii_shifted_min = wave_array[nii_shifted_index-20]
             nii_shifted_max = wave_array[nii_shifted_index+20]
             sii_lower_rest = 0.671829
             sii_lower_shifted = (1 + redshift) * sii_lower_rest
-            sii_lower_shifted_index = np.argmin(np.abs(wave_array - sii_lower_shifted))
+            sii_lower_shifted_index = np.nanargmin(np.abs(wave_array - sii_lower_shifted))
             sii_lower_shifted_min = wave_array[sii_lower_shifted_index-20]
             sii_lower_shifted_max = wave_array[sii_lower_shifted_index+20]
             sii_upper_rest = 0.671829
             sii_upper_shifted = (1 + redshift) * sii_upper_rest
-            sii_upper_shifted_index = np.argmin(np.abs(wave_array - sii_upper_shifted))
+            sii_upper_shifted_index = np.nanargmin(np.abs(wave_array - sii_upper_shifted))
             sii_upper_shifted_min = wave_array[sii_upper_shifted_index-20]
             sii_upper_shifted_max = wave_array[sii_upper_shifted_index+20]
 
@@ -3049,7 +3512,7 @@ def mask_emission_lines(wave_array,
 
             oii_rest = 0.37284835
             oii_shifted = (1 + redshift) * oii_rest
-            oii_shifted_index = np.argmin(np.abs(wave_array - oii_shifted))
+            oii_shifted_index = np.nanargmin(np.abs(wave_array - oii_shifted))
             oii_shifted_min = wave_array[oii_shifted_index-20]
             oii_shifted_max = wave_array[oii_shifted_index+20]
             #print 'YJ-band emission lines to mask'
@@ -3069,17 +3532,17 @@ def mask_emission_lines(wave_array,
 
             h_beta_rest = 0.4862721
             h_beta_shifted = (1 + redshift) * h_beta_rest
-            h_beta_shifted_index = np.argmin(np.abs(wave_array - h_beta_shifted))
+            h_beta_shifted_index = np.nanargmin(np.abs(wave_array - h_beta_shifted))
             h_beta_shifted_min = wave_array[h_beta_shifted_index-20]
             h_beta_shifted_max = wave_array[h_beta_shifted_index+20]
             oiii_4960_rest = 0.4960295
             oiii_4960_shifted = (1 + redshift) * oiii_4960_rest
-            oiii_4960_shifted_index = np.argmin(np.abs(wave_array - oiii_4960_shifted))
+            oiii_4960_shifted_index = np.nanargmin(np.abs(wave_array - oiii_4960_shifted))
             oiii_4960_shifted_min = wave_array[oiii_4960_shifted_index-20]
             oiii_4960_shifted_max = wave_array[oiii_4960_shifted_index+20]
             oiii_5008_rest = 0.5008239
             oiii_5008_shifted = (1 + redshift) * oiii_5008_rest
-            oiii_5008_shifted_index = np.argmin(np.abs(wave_array - oiii_5008_shifted))
+            oiii_5008_shifted_index = np.nanargmin(np.abs(wave_array - oiii_5008_shifted))
             oiii_5008_shifted_min = wave_array[oiii_5008_shifted_index-20]
             oiii_5008_shifted_max = wave_array[oiii_5008_shifted_index+20]
             #print 'H-band emission lines to mask'
@@ -3132,10 +3595,15 @@ def perturb_value(noise,
     return ran_array + flux_array
 
 #multi_vel_field_stott('/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/Hband/KLP_H_NAMES_FINAL.txt',
-#                      'oiii',
-#                      3.0,
-#                      g_c_min=0.25,
-#                      g_c_max=1.75,
-#                      tol=60,
-#                      method='median',
-#                      ntimes=200)
+#                        'oiii',
+#                          3.0,
+#                          0.25,
+#                          1.75,
+#                          ntimes=200,
+#                          spatial_smooth=True,
+#                          spectral_smooth=False,
+#                          smoothing_psf=0.2,
+#                          spectral_smooth_width=2,
+#                          prog='klp',
+#                          emp_mask=True,
+#                          weight_fit=False)

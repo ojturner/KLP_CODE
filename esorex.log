@@ -1,28 +1,28 @@
 
-Start time     : 2018-03-15T10:09:36
+Start time     : 2018-03-23T15:01:31
 Program name   : esorex
 Severity level : [ INFO  ] 
 
-10:09:36 [ INFO  ] : [tid=000] This is EsoRex, version 3.12.3
-10:09:36 [ INFO  ] : [tid=000] using the libraries: CPL = 7.0, CFITSIO = 3.36, WCSLIB = 4.24, FFTW (normal precision) = 3.3.4-sse2, FFTW (single precision) = 3.3.4-sse2, OPENMP = 201307
-10:09:36 [ INFO  ] : [tid=000] Invocation command line was: esorex kmo_shift --ifu=0 --shifts=0.0334090289726,-1.08051951617 --extrapolate=FALSE /disk2/turner/disk2/turner/DATA/KLP/KMOS_3D_DATA/GS/K/P3/p3_comb/COMBINE_SCI_RECONSTRUCTED_GS3_12468.fits
-10:09:36 [ INFO  ] : [tid=000] --- Parameter setup for kmo_shift ---------
-10:09:36 [ INFO  ] kmo_dfs_print_parameter_help: [tid=000] imethod: BCS (Method to use for interpolation.
+15:01:31 [ INFO  ] : [tid=000] This is EsoRex, version 3.12.3
+15:01:31 [ INFO  ] : [tid=000] using the libraries: CPL = 7.0, CFITSIO = 3.36, WCSLIB = 4.24, FFTW (normal precision) = 3.3.4-sse2, FFTW (single precision) = 3.3.4-sse2, OPENMP = 201307
+15:01:31 [ INFO  ] : [tid=000] Invocation command line was: esorex kmo_shift --ifu=0 --shifts=-0.373170559847,0.496123915959 --extrapolate=FALSE /disk2/turner/disk2/turner/DATA/KLP/H/COS1/ZAP_cos_p1_comb/COMBINE_SCI_RECONSTRUCTED_COS4_10347.fits
+15:01:31 [ INFO  ] : [tid=000] --- Parameter setup for kmo_shift ---------
+15:01:31 [ INFO  ] kmo_dfs_print_parameter_help: [tid=000] imethod: BCS (Method to use for interpolation.
 ["BCS" (bicubic spline, default), "NN" (nearest neighbor)])
-10:09:36 [ INFO  ] kmo_dfs_print_parameter_help: [tid=000] extrapolate: 0 (Applies only to 'method=BCS' when doing sub-pixel shifts: FALSE: shifted IFU will be filled with NaN's at the borders,TRUE: shifted IFU will be extrapolated at the borders)
-10:09:36 [ INFO  ] kmo_dfs_print_parameter_help: [tid=000] shifts: 0.0334090289726,-1.08051951617 (The shifts for each spatial dimension for all specified IFUs."x1,y1;x2,y2;..." (arcsec))
-10:09:36 [ INFO  ] kmo_dfs_print_parameter_help: [tid=000] ifu: 0 (The IFU to shift [1 to 24] or shift all IFUs Default value of 0 applies shift to all IFUs.)
-10:09:36 [ INFO  ] kmo_dfs_print_parameter_help: [tid=000] flux: 0 (Apply flux conservation: (TRUE (apply) or FALSE (don't apply))
-10:09:36 [ INFO  ] kmo_dfs_print_parameter_help: [tid=000] wcs-only: 0 (FALSE: if data and wcs should be updated.TRUE: if only wcs should be corrected)
-10:09:36 [ INFO  ] : [tid=000] -------------------------------------------
-10:09:36 [ INFO  ] cpl_dfs_product_save: [tid=000] Writing FITS propertylist product(SHIFT): SHIFT.fits
-10:09:48 [ INFO  ] kmo_priv_shift: [tid=000] Applied subpixel shift to IFU 1
-10:09:48 [ INFO  ] kmo_priv_shift: [tid=000] Applied pixel shift to IFU 1
-10:09:48 [ INFO  ] : [tid=000] Calculating product checksums
-10:09:48 [ INFO  ] : [tid=000] Created product SHIFT.fits (in place)
-10:09:48 [ INFO  ] : [tid=000] 1 product created
-10:09:48 [ INFO  ] : [tid=000] Recipe operation(s) took           11.6 seconds to complete.
-10:09:48 [ INFO  ] : [tid=000] Size of single raw input frame  =    47.35 MB
+15:01:31 [ INFO  ] kmo_dfs_print_parameter_help: [tid=000] extrapolate: 0 (Applies only to 'method=BCS' when doing sub-pixel shifts: FALSE: shifted IFU will be filled with NaN's at the borders,TRUE: shifted IFU will be extrapolated at the borders)
+15:01:31 [ INFO  ] kmo_dfs_print_parameter_help: [tid=000] shifts: -0.373170559847,0.496123915959 (The shifts for each spatial dimension for all specified IFUs."x1,y1;x2,y2;..." (arcsec))
+15:01:31 [ INFO  ] kmo_dfs_print_parameter_help: [tid=000] ifu: 0 (The IFU to shift [1 to 24] or shift all IFUs Default value of 0 applies shift to all IFUs.)
+15:01:31 [ INFO  ] kmo_dfs_print_parameter_help: [tid=000] flux: 0 (Apply flux conservation: (TRUE (apply) or FALSE (don't apply))
+15:01:31 [ INFO  ] kmo_dfs_print_parameter_help: [tid=000] wcs-only: 0 (FALSE: if data and wcs should be updated.TRUE: if only wcs should be corrected)
+15:01:31 [ INFO  ] : [tid=000] -------------------------------------------
+15:01:31 [ INFO  ] cpl_dfs_product_save: [tid=000] Writing FITS propertylist product(SHIFT): SHIFT.fits
+15:01:46 [ INFO  ] kmo_priv_shift: [tid=000] Applied subpixel shift to IFU 1
+15:01:46 [ INFO  ] kmo_priv_shift: [tid=000] Applied pixel shift to IFU 1
+15:01:46 [ INFO  ] : [tid=000] Calculating product checksums
+15:01:46 [ INFO  ] : [tid=000] Created product SHIFT.fits (in place)
+15:01:46 [ INFO  ] : [tid=000] 1 product created
+15:01:46 [ INFO  ] : [tid=000] Recipe operation(s) took           14.4 seconds to complete.
+15:01:46 [ INFO  ] : [tid=000] Size of single raw input frame  =    27.73 MB
 
-10:09:48 [ INFO  ] : [tid=000] => processing rate of     4.08 MB/sec 
+15:01:46 [ INFO  ] : [tid=000] => processing rate of     1.93 MB/sec 
 

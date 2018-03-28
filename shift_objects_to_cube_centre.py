@@ -63,7 +63,7 @@ from vel_field_class import vel_field
 # look at just the Kband to check the performance
 # once the mask limits are supplied
 
-table_k = ascii.read('/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/Kband/KLP_K_NAMES_WITH_CONTINUUM.txt')
+table_k = ascii.read('/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/Hband/KLP_H_NAMES_WITH_CONTINUUM.txt')
 names_k = table_k['Filename']
 redshift_k = table_k['redshift']
 cont_x_lower_k = table_k['cont_x_lower']
@@ -189,4 +189,4 @@ central_y_position = np.array(central_y_position)
 
 table_k['Central_x'] = central_x_position
 table_k['Central_y'] = central_y_position
-table_k.write('/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/Kband/KLP_K_BOGUS.txt', format='ascii')
+table_k.write('/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/Hband/KLP_H_BOGUS.txt', format='ascii')

@@ -298,7 +298,8 @@ def line_fit(wave_array,
              name,
              plot_save_name,
              masked=False,
-             prog='klp'):
+             prog='klp',
+             weight=False):
 
     """
     Def:
@@ -429,15 +430,20 @@ def line_fit(wave_array,
     med_for_norm = abs(np.nanmedian(spec[min_index:max_index]))
     weights_norm = weights/med_for_norm
 
-    result =  comp_mod.fit(spec[min_index:max_index]/med_for_norm,
-                           params=pars,
-                           x=wave_array[min_index:max_index],
-                           weights=(1.0/weights_norm[min_index:max_index])**2)
+    if weight:
 
-#    print result.fit_report()
-#    res_plot = result.plot()
-#    plt.show(res_plot)
-#    plt.close(res_plot)
+        result =  comp_mod.fit(spec[min_index:max_index]/med_for_norm,
+                               params=pars,
+                               x=wave_array[min_index:max_index],
+                               weights=(1.0/weights_norm[min_index:max_index])**2)
+
+    else:
+
+        result =  comp_mod.fit(spec[min_index:max_index]/med_for_norm,
+                               params=pars,
+                               x=wave_array[min_index:max_index])
+
+    print result.fit_report()
 
     # another point at which we must discriminate between KLP and KDS
     if prog == 'klp':
@@ -625,9 +631,10 @@ def line_fit(wave_array,
             constant = result.best_values['c']
 
     best_fit = result.eval(x=wave_array)*med_for_norm
+    residuals = spec - best_fit
     ylim_upper = np.nanmax(best_fit[min_index:max_index])+0.2*np.nanmax(best_fit[min_index:max_index])
 
-    line_fit_fig, line_fit_ax = plt.subplots(2,1,figsize=(18,8), sharex=True, gridspec_kw = {'height_ratios':[4,1]})
+    line_fit_fig, line_fit_ax = plt.subplots(3,1,figsize=(18,8), sharex=True, gridspec_kw = {'height_ratios':[4,1,1]})
 
     lines = {'linestyle': '-'}
     plt.rc('lines', **lines)
@@ -642,10 +649,23 @@ def line_fit(wave_array,
                                 facecolor='red',
                                 edgecolor='red',
                                 alpha=0.5)
+    
+    line_fit_ax[2].errorbar(wave_array[100:1900],
+                            residuals[100:1900],
+                            ecolor='midnightblue',
+                            yerr=[weights[100:1900],weights[100:1900]],
+                            marker='o',
+                            markersize=5,
+                            markerfacecolor='midnightblue',
+                            markeredgecolor='midnightblue',
+                            markeredgewidth=1,
+                            capsize=1,
+                            elinewidth=1)
 
     #ax[0].set_ylim(-0.2,1.0)
     line_fit_ax[0].set_xlim(wave_array[min_index],wave_array[max_index])
     line_fit_ax[0].set_ylim(ylim_lower,ylim_upper)
+    line_fit_ax[2].set_ylim(-5E-14,5E-14)
     line_fit_ax[1].set_ylim(np.nanmin(weights[min_index:max_index]),np.nanmax(weights[min_index:max_index]))
 
     for ranges in sky_dict.values():
@@ -686,10 +706,24 @@ def line_fit(wave_array,
                    width=4)
 
     [i.set_linewidth(4.0) for i in line_fit_ax[1].spines.itervalues()]
+
+    line_fit_ax[2].tick_params(axis='both',
+                   which='major',
+                   labelsize=18,
+                   length=12,
+                   width=4)
+
+    line_fit_ax[2].tick_params(axis='both',
+                   which='minor',
+                   labelsize=18,
+                   length=6,
+                   width=4)
+
+    [i.set_linewidth(4.0) for i in line_fit_ax[2].spines.itervalues()]
 #    ax[0].yaxis.set_major_locator(MaxNLocator(prune='lower'))
 #    ax[0].yaxis.set_major_locator(MaxNLocator(integer=True))
         
-    plt.show(line_fit_fig)
+    #plt.show(line_fit_fig)
     line_fit_fig.savefig(plot_save_name)
     plt.close(line_fit_fig)
 
@@ -888,14 +922,14 @@ def h_band_mod(tol,
                                 value=oiii_4960_shifted,
                                 expr='oiii5_center - ((%.6f)*%.6f)' % (1.+redshift,delta_oiii))
         comp_mod.set_param_hint('oiii4_amplitude',
-                                value=0.3,
+                                value=0.015,
                                 expr='0.3448*oiii5_amplitude')
         comp_mod.set_param_hint('oiii5_center',
                                 value=oiii_5008_shifted,
                                 min=oiii_5008_shifted_min,
                                 max=oiii_5008_shifted_max)
         comp_mod.set_param_hint('oiii5_amplitude',
-                                value=0.9,
+                                value=0.05,
                                 min=0)
         comp_mod.set_param_hint('oiii5_sigma',
                                 value=0.001,
@@ -1020,7 +1054,7 @@ def yj_band_mod(tol,
                             min=oii_3727_shifted_min,
                             max=oii_3727_shifted_max)
     comp_mod.set_param_hint('oiil_amplitude',
-                            value=0.01,
+                            value=0.02,
                             min=0)
     comp_mod.set_param_hint('oiil_sigma',
                             value=0.0005,
@@ -1033,7 +1067,7 @@ def yj_band_mod(tol,
                             min=0.000,
                             max=0.003)
     comp_mod.set_param_hint('oiih_amplitude',
-                            value=0.01,
+                            value=0.02,
                             min=0)
 
 

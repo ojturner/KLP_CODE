@@ -76,6 +76,8 @@ def multi_vel_field_all_lines(infile_k,
                               smoothing_psf=0.3,
                               spectral_smooth_width=2,
                               prog='klp',
+                              emp_mask=True,
+                              weight_fit=False,
                               **kwargs):
     
     noise_method = 'mask'
@@ -334,6 +336,7 @@ def multi_vel_field_all_lines(infile_k,
 
         # one at a time calculate the line maps 
         # and then plot
+        print 'FITTING [OII]3727'
         oii_grid = spaxel_fit.vel_field_stott_binning(obj_name__yj,
                                                       sky_cube__yj,
                                                       'oii',
@@ -353,7 +356,10 @@ def multi_vel_field_all_lines(infile_k,
                                                       spectral_smooth=spectral_smooth,
                                                       smoothing_psf=smoothing_psf,
                                                       spectral_smooth_width=spectral_smooth_width,
-                                                      prog=prog)
+                                                      prog=prog,
+                                                      emp_mask=emp_mask,
+                                                      weight_fit=weight_fit)
+        print 'FITTING Hb'
         hb_grid = spaxel_fit.vel_field_stott_binning(obj_name__h,
                                                       sky_cube__h,
                                                       'hb',
@@ -373,7 +379,10 @@ def multi_vel_field_all_lines(infile_k,
                                                       spectral_smooth=spectral_smooth,
                                                       smoothing_psf=smoothing_psf,
                                                       spectral_smooth_width=spectral_smooth_width,
-                                                      prog=prog)
+                                                      prog=prog,
+                                                      emp_mask=emp_mask,
+                                                      weight_fit=weight_fit)
+        print 'FITTING [OIII]4960'
         oiiiweak_grid = spaxel_fit.vel_field_stott_binning(obj_name__h,
                                                       sky_cube__h,
                                                       'oiiiweak',
@@ -393,7 +402,10 @@ def multi_vel_field_all_lines(infile_k,
                                                       spectral_smooth=spectral_smooth,
                                                       smoothing_psf=smoothing_psf,
                                                       spectral_smooth_width=spectral_smooth_width,
-                                                      prog=prog)
+                                                      prog=prog,
+                                                      emp_mask=emp_mask,
+                                                      weight_fit=weight_fit)
+        print 'FITTING [OIII]5007'
         oiii_grid = spaxel_fit.vel_field_stott_binning(obj_name__h,
                                                       sky_cube__h,
                                                       'oiii',
@@ -413,7 +425,10 @@ def multi_vel_field_all_lines(infile_k,
                                                       spectral_smooth=spectral_smooth,
                                                       smoothing_psf=smoothing_psf,
                                                       spectral_smooth_width=spectral_smooth_width,
-                                                      prog=prog)
+                                                      prog=prog,
+                                                      emp_mask=emp_mask,
+                                                      weight_fit=weight_fit)
+        print 'FITTING Ha'
         ha_grid = spaxel_fit.vel_field_stott_binning(obj_name__k,
                                                       sky_cube__k,
                                                       'ha',
@@ -433,7 +448,10 @@ def multi_vel_field_all_lines(infile_k,
                                                       spectral_smooth=spectral_smooth,
                                                       smoothing_psf=smoothing_psf,
                                                       spectral_smooth_width=spectral_smooth_width,
-                                                      prog=prog)
+                                                      prog=prog,
+                                                      emp_mask=emp_mask,
+                                                      weight_fit=weight_fit)
+        print 'FITTING [NII]'
         nii_grid = spaxel_fit.vel_field_stott_binning(obj_name__k,
                                                       sky_cube__k,
                                                       'nii',
@@ -453,7 +471,9 @@ def multi_vel_field_all_lines(infile_k,
                                                       spectral_smooth=spectral_smooth,
                                                       smoothing_psf=smoothing_psf,
                                                       spectral_smooth_width=spectral_smooth_width,
-                                                      prog=prog)
+                                                      prog=prog,
+                                                      emp_mask=emp_mask,
+                                                      weight_fit=weight_fit)
 
         # return the sky lines for plotting over the integrated spectrum
         yj_sky_dict = mask_the_sky.ret_yj_sky()
@@ -1618,7 +1638,7 @@ def multi_vel_field_all_lines(infile_k,
 
         fig.tight_layout()
         # plt.show()
-        save_name = '/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/ALL_LINE_GRIDS/blurred_0.2_without_3_sig_mask/' + gal_name + '.pdf'
+        save_name = '/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/ALL_LINE_GRIDS/weighting_oii_gauss_blurred_0.4_emp_mask5_sn3_gauss025175/' + gal_name + '.pdf'
         fig.savefig(save_name)
         plt.close('all')
 
@@ -1631,7 +1651,9 @@ multi_vel_field_all_lines('/disk2/turner/disk2/turner/DATA/KLP/ANALYSIS/Kband/KL
                           ntimes=200,
                           spatial_smooth=True,
                           spectral_smooth=False,
-                          smoothing_psf=0.2,
+                          smoothing_psf=0.4,
                           spectral_smooth_width=2,
-                          prog='klp')
+                          prog='klp',
+                          emp_mask=True,
+                          weight_fit=True)
 
