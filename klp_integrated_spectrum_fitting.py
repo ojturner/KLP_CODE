@@ -299,7 +299,8 @@ def line_fit(wave_array,
              plot_save_name,
              masked=False,
              prog='klp',
-             weight=False):
+             weight=False,
+             make_plot=True):
 
     """
     Def:
@@ -310,7 +311,7 @@ def line_fit(wave_array,
     respect to one another and what happens when one of the emission lines is
     not there.
     """
-    print 'FITTING: %s' % name
+    # print 'FITTING: %s' % name
     # global tolerance for masking the lines in noise computation
     tol_global = 0.0025
     # line wavelengths
@@ -352,27 +353,27 @@ def line_fit(wave_array,
 
     # choose the appropriate sky dictionary for the filter
     if filt == 'K':
-        print 'K-band fitting'
+        # print 'K-band fitting'
         sky_dict = mask_the_sky.ret_k_sky()
-        tol = 0.00028
+        tol = 0.0010
         comp_mod, pars, min_index, max_index = k_band_mod(tol,
                                                           redshift,
                                                           wave_array,
                                                           prog)
 
     elif filt == 'H':
-        print 'H-band fitting'
+        # print 'H-band fitting'
         sky_dict = mask_the_sky.ret_h_sky()
-        tol = 0.00028
+        tol = 0.0010
         comp_mod, pars, min_index, max_index = h_band_mod(tol,
                                                           redshift,
                                                           wave_array,
                                                           prog)
 
     elif filt == 'YJ':
-        print 'YJ-band fitting'
+        # print 'YJ-band fitting'
         sky_dict = mask_the_sky.ret_yj_sky()
-        tol = 0.00028
+        tol = 0.0003
         comp_mod, pars, min_index, max_index = yj_band_mod(tol,
                                                            redshift,
                                                            wave_array)
@@ -443,7 +444,7 @@ def line_fit(wave_array,
                                params=pars,
                                x=wave_array[min_index:max_index])
 
-    print result.fit_report()
+    # print result.fit_report()
 
     # another point at which we must discriminate between KLP and KDS
     if prog == 'klp':
@@ -456,10 +457,10 @@ def line_fit(wave_array,
                 ha_error = -99
             ha_sigma = (result.best_values['ha_sigma'] / result.best_values['ha_center']) * c
             try:
-                ha_sigma_error = ( np.sqrt(result.covar[1,1]) / result.best_values['ha_center']) * c
+                ha_sigma_error = ( np.sqrt(result.covar[3,3]) / result.best_values['ha_center']) * c
             except:
                 ha_sigma_error = -99
-            print 'Ha SN %s' % (ha_sn)
+            # print 'Ha SN %s' % (ha_sn)
             nii_rescaled = (result.best_values['nii_amplitude']*med_for_norm) / (result.best_values['nii_sigma'] * np.sqrt(2 * np.pi))
             nii_sn = 1.0*nii_rescaled / noise
             try:
@@ -471,11 +472,11 @@ def line_fit(wave_array,
                 nii_sigma_error = ( np.sqrt(result.covar[3,3]) / result.best_values['nii_center']) * c
             except TypeError:
                 nii_sigma_error = -99
-            print 'NII SN %s' % (nii_sn)
-            output_array = np.array([[result.best_values['ha_amplitude']*med_for_norm,ha_error,ha_sn,ha_sigma,ha_sigma_error],
-                            [result.best_values['nii_amplitude']*med_for_norm,nii_error,nii_sn,nii_sigma,nii_sigma_error]])
-            ylim_lower = -0.2*(result.best_values['ha_amplitude']*med_for_norm/result.best_values['ha_sigma'])
-            ylim_upper = (result.best_values['ha_amplitude']*med_for_norm/result.best_values['ha_sigma']) + 0.3*(result.best_values['ha_amplitude']*med_for_norm/result.best_values['ha_sigma'])
+            # print 'NII SN %s' % (nii_sn)
+            output_array = np.array([[result.best_values['ha_amplitude']*med_for_norm,ha_error,ha_sn,ha_sigma,ha_sigma_error,result.best_values['ha_center']],
+                            [result.best_values['nii_amplitude']*med_for_norm,nii_error,nii_sn,nii_sigma,nii_sigma_error,result.best_values['nii_center']]])
+            ylim_lower = -1.0*(result.best_values['ha_amplitude']*med_for_norm/result.best_values['ha_sigma'])
+            ylim_upper = 1.3*(result.best_values['ha_amplitude']*med_for_norm/result.best_values['ha_sigma'])
             constant = 0
         elif filt == 'YJ':
             oii_3727_rescaled = (result.best_values['oiil_amplitude']*med_for_norm) / (result.best_values['oiil_sigma'] * np.sqrt(2 * np.pi))
@@ -489,7 +490,7 @@ def line_fit(wave_array,
                 oii_3727_sigma_error = (np.sqrt(result.covar[0,0]) / result.best_values['oiil_center']) * c
             except TypeError:
                 oii_3727_sigma_error = -99
-            print 'OII3727 SN %s' % (oii_3727_sn)
+            # print 'OII3727 SN %s' % (oii_3727_sn)
             oii_3729_rescaled = (result.best_values['oiih_amplitude']*med_for_norm) / (result.best_values['oiih_sigma'] * np.sqrt(2 * np.pi))
             oii_3729_sn = (1.0*oii_3729_rescaled / noise)
             try:
@@ -501,56 +502,56 @@ def line_fit(wave_array,
                 oii_3729_sigma_error = (np.sqrt(result.covar[0,0]) / result.best_values['oiih_center']) * c
             except TypeError:
                 oii_3729_sigma_error = -99
-            print 'OII3729 SN %s' % (oii_3729_sn)
-            output_array = np.array([[result.best_values['oiil_amplitude']*med_for_norm,oii_3727_error,oii_3727_sn,oii_3727_sigma,oii_3727_sigma_error],
-                                     [result.best_values['oiih_amplitude']*med_for_norm,oii_3729_error,oii_3729_sn,oii_3729_sigma,oii_3729_sigma_error]])
-            ylim_lower = -0.2*(result.best_values['oiil_amplitude']*med_for_norm/result.best_values['oiil_sigma'])
-            ylim_upper = (result.best_values['oiil_amplitude']*med_for_norm/result.best_values['oiil_sigma'])+0.3*(result.best_values['oiil_amplitude']*med_for_norm/result.best_values['oiil_sigma'])
+            # print 'OII3729 SN %s' % (oii_3729_sn)
+            output_array = np.array([[result.best_values['oiil_amplitude']*med_for_norm,oii_3727_error,oii_3727_sn,oii_3727_sigma,oii_3727_sigma_error,result.best_values['oiil_center']],
+                                     [result.best_values['oiih_amplitude']*med_for_norm,oii_3729_error,oii_3729_sn,oii_3729_sigma,oii_3729_sigma_error,result.best_values['oiih_center']]])
+            ylim_lower = -1*((result.best_values['oiil_amplitude']*med_for_norm/result.best_values['oiil_sigma'])+(result.best_values['oiih_amplitude']*med_for_norm/result.best_values['oiih_sigma']))
+            ylim_upper = 1.3*((result.best_values['oiil_amplitude']*med_for_norm/result.best_values['oiil_sigma'])+(result.best_values['oiih_amplitude']*med_for_norm/result.best_values['oiih_sigma']))
             constant = result.best_values['c']
         elif filt == 'H':
             hb_rescaled = (result.best_values['hb_amplitude']*med_for_norm) / (result.best_values['hb_sigma'] * np.sqrt(2 * np.pi))
             hb_sn = 1.0*hb_rescaled / noise
             try:
-                hb_error = np.sqrt(result.covar[4,4])*med_for_norm
+                hb_error = np.sqrt(result.covar[2,2])*med_for_norm
             except TypeError:
                 hb_error = -99
             hb_sigma = (result.best_values['hb_sigma'] / result.best_values['hb_center']) * c
             try:
-                hb_sigma_error = ( np.sqrt(result.covar[0,0]) / result.best_values['hb_center']) * c
+                hb_sigma_error = ( np.sqrt(result.covar[3,3]) / result.best_values['hb_center']) * c
             except:
                 hb_sigma_error = -99
-            print 'Hb SN %s' % (hb_sn)
+            # print 'Hb SN %s' % (hb_sn)
             oiii_4960_rescaled = (result.best_values['oiii4_amplitude']*med_for_norm) / (result.best_values['oiii4_sigma'] * np.sqrt(2 * np.pi))
             oiii_4960_sn = 1.0*oiii_4960_rescaled / noise
             try:
-                oiii_4960_error = np.sqrt(result.covar[1,1])*med_for_norm
+                oiii_4960_error = np.sqrt(result.covar[0,0])*med_for_norm
             except TypeError:
                 oiii_4960_error = -99
             oiii_4960_sigma = (result.best_values['oiii4_sigma'] / result.best_values['oiii4_center']) * c
             try:
-                oiii_4960_sigma_error = ( np.sqrt(result.covar[5,5]) / result.best_values['oiii4_center']) * c
+                oiii_4960_sigma_error = ( np.sqrt(result.covar[3,3]) / result.best_values['oiii4_center']) * c
             except TypeError:
                 oiii_4960_sigma_error = -99
-            print 'OIII4960 SN %s' % (oiii_4960_sn)
+            # print 'OIII4960 SN %s' % (oiii_4960_sn)
             oiii_5007_rescaled = (result.best_values['oiii5_amplitude']*med_for_norm) / (result.best_values['oiii5_sigma'] * np.sqrt(2 * np.pi))
             oiii_5007_sn = 1.0*oiii_5007_rescaled / noise
             try:
-                oiii_5007_error = np.sqrt(result.covar[1,1])*med_for_norm
+                oiii_5007_error = np.sqrt(result.covar[0,0])*med_for_norm
             except TypeError:
                 oiii_5007_error = -99
             oiii_5007_sigma = (result.best_values['oiii5_sigma'] / result.best_values['oiii5_center']) * c
             try:
-                oiii_5007_sigma_error = (np.sqrt(result.covar[5,5]) / result.best_values['oiii5_center']) * c
+                oiii_5007_sigma_error = (np.sqrt(result.covar[3,3]) / result.best_values['oiii5_center']) * c
             except TypeError:
                 oiii_5007_sigma_error = -99
-            print 'OIII5007 SN %s' % (oiii_5007_sn)
-            print 'NOISE %s' % noise
-            print 'SIGNAL %s' % oiii_5007_rescaled
-            output_array = np.array([[result.best_values['hb_amplitude']*med_for_norm,hb_error,hb_sn,hb_sigma,hb_sigma_error],
-                            [result.best_values['oiii5_amplitude']*med_for_norm,oiii_5007_error,oiii_5007_sn,oiii_5007_sigma,oiii_5007_sigma_error],
-                            [result.best_values['oiii4_amplitude']*med_for_norm,oiii_4960_error,oiii_4960_sn,oiii_4960_sigma,oiii_4960_sigma_error]])
-            ylim_lower = -0.1*result.best_values['oiii5_amplitude']*med_for_norm/result.best_values['oiii5_sigma']
-            ylim_upper = (result.best_values['oiii5_amplitude']*med_for_norm/result.best_values['oiii5_sigma']) + 0.3*(result.best_values['oiii5_amplitude']*med_for_norm/result.best_values['oiii5_sigma'])
+            # print 'OIII5007 SN %s' % (oiii_5007_sn)
+            # print 'NOISE %s' % noise
+            # print 'SIGNAL %s' % oiii_5007_rescaled
+            output_array = np.array([[result.best_values['hb_amplitude']*med_for_norm,hb_error,hb_sn,hb_sigma,hb_sigma_error,result.best_values['hb_center']],
+                            [result.best_values['oiii5_amplitude']*med_for_norm,oiii_5007_error,oiii_5007_sn,oiii_5007_sigma,oiii_5007_sigma_error,result.best_values['oiii5_center']],
+                            [result.best_values['oiii4_amplitude']*med_for_norm,oiii_4960_error,oiii_4960_sn,oiii_4960_sigma,oiii_4960_sigma_error,result.best_values['oiii4_center']]])
+            ylim_lower = -1.0*result.best_values['oiii5_amplitude']*med_for_norm/result.best_values['oiii5_sigma']
+            ylim_upper = 1.3*(result.best_values['oiii5_amplitude']*med_for_norm/result.best_values['oiii5_sigma'])
             constant = result.best_values['c']
 
     else:
@@ -558,46 +559,46 @@ def line_fit(wave_array,
             hb_rescaled = (result.best_values['hb_amplitude']*med_for_norm) / (result.best_values['hb_sigma'] * np.sqrt(2 * np.pi))
             hb_sn = 1.0*hb_rescaled / noise
             try:
-                hb_error = np.sqrt(result.covar[4,4])*med_for_norm
+                hb_error = np.sqrt(result.covar[2,2])*med_for_norm
             except TypeError:
                 hb_error = -99
             hb_sigma = (result.best_values['hb_sigma'] / result.best_values['hb_center']) * c
             try:
-                hb_sigma_error = ( np.sqrt(result.covar[0,0]) / result.best_values['hb_center']) * c
+                hb_sigma_error = ( np.sqrt(result.covar[3,3]) / result.best_values['hb_center']) * c
             except:
                 hb_sigma_error = -99
-            print 'Hb SN %s' % (hb_sn)
+            # print 'Hb SN %s' % (hb_sn)
             oiii_4960_rescaled = (result.best_values['oiii4_amplitude']*med_for_norm) / (result.best_values['oiii4_sigma'] * np.sqrt(2 * np.pi))
             oiii_4960_sn = 1.0*oiii_4960_rescaled / noise
             try:
-                oiii_4960_error = np.sqrt(result.covar[1,1])*med_for_norm
+                oiii_4960_error = np.sqrt(result.covar[0,0])*med_for_norm
             except TypeError:
                 oiii_4960_error = -99
             oiii_4960_sigma = (result.best_values['oiii4_sigma'] / result.best_values['oiii4_center']) * c
             try:
-                oiii_4960_sigma_error = ( np.sqrt(result.covar[5,5]) / result.best_values['oiii4_center']) * c
+                oiii_4960_sigma_error = ( np.sqrt(result.covar[3,3]) / result.best_values['oiii4_center']) * c
             except TypeError:
                 oiii_4960_sigma_error = -99
-            print 'OIII4960 SN %s' % (oiii_4960_sn)
+            # print 'OIII4960 SN %s' % (oiii_4960_sn)
             oiii_5007_rescaled = (result.best_values['oiii5_amplitude']*med_for_norm) / (result.best_values['oiii5_sigma'] * np.sqrt(2 * np.pi))
             oiii_5007_sn = 1.0*oiii_5007_rescaled / noise
             try:
-                oiii_5007_error = np.sqrt(result.covar[1,1])*med_for_norm
+                oiii_5007_error = np.sqrt(result.covar[0,0])*med_for_norm
             except TypeError:
                 oiii_5007_error = -99
             oiii_5007_sigma = (result.best_values['oiii5_sigma'] / result.best_values['oiii5_center']) * c
             try:
-                oiii_5007_sigma_error = (np.sqrt(result.covar[5,5]) / result.best_values['oiii5_center']) * c
+                oiii_5007_sigma_error = (np.sqrt(result.covar[3,3]) / result.best_values['oiii5_center']) * c
             except TypeError:
                 oiii_5007_sigma_error = -99
-            print 'OIII5007 SN %s' % (oiii_5007_sn)
-            print 'NOISE %s' % noise
-            print 'SIGNAL %s' % oiii_5007_rescaled
-            output_array = np.array([[result.best_values['hb_amplitude']*med_for_norm,hb_error,hb_sn,hb_sigma,hb_sigma_error],
-                            [result.best_values['oiii5_amplitude']*med_for_norm,oiii_5007_error,oiii_5007_sn,oiii_5007_sigma,oiii_5007_sigma_error],
-                            [result.best_values['oiii4_amplitude']*med_for_norm,oiii_4960_error,oiii_4960_sn,oiii_4960_sigma,oiii_4960_sigma_error]])
-            ylim_lower = -0.1*result.best_values['oiii5_amplitude']*med_for_norm/result.best_values['oiii5_sigma']
-            ylim_upper = (result.best_values['oiii5_amplitude']*med_for_norm/result.best_values['oiii5_sigma']) + 0.3*(result.best_values['oiii5_amplitude']*med_for_norm/result.best_values['oiii5_sigma'])
+            # print 'OIII5007 SN %s' % (oiii_5007_sn)
+            # print 'NOISE %s' % noise
+            # print 'SIGNAL %s' % oiii_5007_rescaled
+            output_array = np.array([[result.best_values['hb_amplitude']*med_for_norm,hb_error,hb_sn,hb_sigma,hb_sigma_error,result.best_values['hb_center']],
+                            [result.best_values['oiii5_amplitude']*med_for_norm,oiii_5007_error,oiii_5007_sn,oiii_5007_sigma,oiii_5007_sigma_error,result.best_values['oiii5_center']],
+                            [result.best_values['oiii4_amplitude']*med_for_norm,oiii_4960_error,oiii_4960_sn,oiii_4960_sigma,oiii_4960_sigma_error,result.best_values['oiii4_center']]])
+            ylim_lower = -1.0*result.best_values['oiii5_amplitude']*med_for_norm/result.best_values['oiii5_sigma']
+            ylim_upper = 1.3*(result.best_values['oiii5_amplitude']*med_for_norm/result.best_values['oiii5_sigma'])
             constant = result.best_values['c']
         elif filt == 'H':
             oii_3727_rescaled = (result.best_values['oiil_amplitude']*med_for_norm) / (result.best_values['oiil_sigma'] * np.sqrt(2 * np.pi))
@@ -611,7 +612,7 @@ def line_fit(wave_array,
                 oii_3727_sigma_error = (np.sqrt(result.covar[0,0]) / result.best_values['oiil_center']) * c
             except TypeError:
                 oii_3727_sigma_error = -99
-            print 'OII3727 SN %s' % (oii_3727_sn)
+            # print 'OII3727 SN %s' % (oii_3727_sn)
             oii_3729_rescaled = (result.best_values['oiih_amplitude']*med_for_norm) / (result.best_values['oiih_sigma'] * np.sqrt(2 * np.pi))
             oii_3729_sn = (1.0*oii_3729_rescaled / noise)
             try:
@@ -623,109 +624,99 @@ def line_fit(wave_array,
                 oii_3729_sigma_error = (np.sqrt(result.covar[0,0]) / result.best_values['oiih_center']) * c
             except TypeError:
                 oii_3729_sigma_error = -99
-            print 'OII3729 SN %s' % (oii_3729_sn)
-            output_array = np.array([[result.best_values['oiil_amplitude']*med_for_norm,oii_3727_error,oii_3727_sn,oii_3727_sigma,oii_3727_sigma_error],
-                                     [result.best_values['oiih_amplitude']*med_for_norm,oii_3729_error,oii_3729_sn,oii_3729_sigma,oii_3729_sigma_error]])
-            ylim_lower = -0.2*(result.best_values['oiil_amplitude']*med_for_norm/result.best_values['oiil_sigma'])
-            ylim_upper = (result.best_values['oiil_amplitude']*med_for_norm/result.best_values['oiil_sigma'])+0.3*(result.best_values['oiil_amplitude']*med_for_norm/result.best_values['oiil_sigma'])
+            # print 'OII3729 SN %s' % (oii_3729_sn)
+            output_array = np.array([[result.best_values['oiil_amplitude']*med_for_norm,oii_3727_error,oii_3727_sn,oii_3727_sigma,oii_3727_sigma_error,result.best_values['oiil_center']],
+                                     [result.best_values['oiih_amplitude']*med_for_norm,oii_3729_error,oii_3729_sn,oii_3729_sigma,oii_3729_sigma_error,result.best_values['oiih_center']]])
+            ylim_lower = -1*((result.best_values['oiil_amplitude']*med_for_norm/result.best_values['oiil_sigma'])+(result.best_values['oiih_amplitude']*med_for_norm/result.best_values['oiih_sigma']))
+            ylim_upper = 1.3*((result.best_values['oiil_amplitude']*med_for_norm/result.best_values['oiil_sigma'])+(result.best_values['oiih_amplitude']*med_for_norm/result.best_values['oiih_sigma']))
             constant = result.best_values['c']
 
-    best_fit = result.eval(x=wave_array)*med_for_norm
-    residuals = spec - best_fit
-    ylim_upper = np.nanmax(best_fit[min_index:max_index])+0.2*np.nanmax(best_fit[min_index:max_index])
-
-    line_fit_fig, line_fit_ax = plt.subplots(3,1,figsize=(18,8), sharex=True, gridspec_kw = {'height_ratios':[4,1,1]})
-
-    lines = {'linestyle': '-'}
-    plt.rc('lines', **lines)
-
-    line_fit_ax[0].plot(wave_array[100:1900],spec[100:1900],drawstyle='steps-mid')
-    line_fit_ax[0].plot(wave_array[100:1900],best_fit[100:1900],color='red',drawstyle='steps-mid',lw=2)
-    line_fit_ax[1].plot(wave_array[100:1900],weights[100:1900],color='green',drawstyle='steps-mid',lw=2)
-    line_fit_ax[0].plot(wave_array[100:1900],best_fit[100:1900],color='red')
-    line_fit_ax[0].fill_between(wave_array[100:1900],
-                                np.repeat(constant,len(wave_array[100:1900])),
-                                best_fit[100:1900],
-                                facecolor='red',
-                                edgecolor='red',
-                                alpha=0.5)
-    
-    line_fit_ax[2].errorbar(wave_array[100:1900],
-                            residuals[100:1900],
-                            ecolor='midnightblue',
-                            yerr=[weights[100:1900],weights[100:1900]],
-                            marker='o',
-                            markersize=5,
-                            markerfacecolor='midnightblue',
-                            markeredgecolor='midnightblue',
-                            markeredgewidth=1,
-                            capsize=1,
-                            elinewidth=1)
-
-    #ax[0].set_ylim(-0.2,1.0)
-    line_fit_ax[0].set_xlim(wave_array[min_index],wave_array[max_index])
-    line_fit_ax[0].set_ylim(ylim_lower,ylim_upper)
-    line_fit_ax[2].set_ylim(-5E-14,5E-14)
-    line_fit_ax[1].set_ylim(np.nanmin(weights[min_index:max_index]),np.nanmax(weights[min_index:max_index]))
-
-    for ranges in sky_dict.values():
-        line_fit_ax[0].axvspan(ranges[0],ranges[1],alpha=0.5,color='grey')
-
-    fig.subplots_adjust(hspace=.0)
-    yticks = line_fit_ax[0].yaxis.get_major_ticks()
-    yticks[0].label1.set_visible(False)
-
-    # tick parameters 
-    line_fit_ax[0].tick_params(axis='both',
-                   which='major',
-                   labelsize=26,
-                   length=12,
-                   width=4)
-
-    line_fit_ax[0].tick_params(axis='both',
-                   which='minor',
-                   labelsize=26,
-                   length=6,
-                   width=4)
-
-    line_fit_ax[0].minorticks_on()
-    line_fit_ax[0].yaxis.get_offset_text().set_fontsize(26)
-
-    [i.set_linewidth(4.0) for i in line_fit_ax[0].spines.itervalues()]
-    # tick parameters 
-    line_fit_ax[1].tick_params(axis='both',
-                   which='major',
-                   labelsize=18,
-                   length=12,
-                   width=4)
-
-    line_fit_ax[1].tick_params(axis='both',
-                   which='minor',
-                   labelsize=18,
-                   length=6,
-                   width=4)
-
-    [i.set_linewidth(4.0) for i in line_fit_ax[1].spines.itervalues()]
-
-    line_fit_ax[2].tick_params(axis='both',
-                   which='major',
-                   labelsize=18,
-                   length=12,
-                   width=4)
-
-    line_fit_ax[2].tick_params(axis='both',
-                   which='minor',
-                   labelsize=18,
-                   length=6,
-                   width=4)
-
-    [i.set_linewidth(4.0) for i in line_fit_ax[2].spines.itervalues()]
-#    ax[0].yaxis.set_major_locator(MaxNLocator(prune='lower'))
-#    ax[0].yaxis.set_major_locator(MaxNLocator(integer=True))
-        
-    #plt.show(line_fit_fig)
-    line_fit_fig.savefig(plot_save_name)
-    plt.close(line_fit_fig)
+    if make_plot:
+        best_fit = result.eval(x=wave_array)*med_for_norm
+        residuals = spec - best_fit
+        line_fit_fig, line_fit_ax = plt.subplots(3,1,figsize=(18,12), sharex=True, gridspec_kw = {'height_ratios':[4,1,1]})
+        lines = {'linestyle': '-'}
+        plt.rc('lines', **lines)
+        line_fit_ax[0].plot(wave_array[100:1950],spec[100:1950],drawstyle='steps-mid')
+        line_fit_ax[0].plot(wave_array[100:1950],best_fit[100:1950],color='red',drawstyle='steps-mid',lw=2)
+        line_fit_ax[1].plot(wave_array[100:1950],weights[100:1950],color='green',drawstyle='steps-mid',lw=2)
+        line_fit_ax[0].plot(wave_array[100:1950],best_fit[100:1950],color='red')
+        line_fit_ax[0].fill_between(wave_array[100:1950],
+                                    np.repeat(constant,len(wave_array[100:1950])),
+                                    best_fit[100:1950],
+                                    facecolor='red',
+                                    edgecolor='red',
+                                    alpha=0.5)
+        lines = {'linestyle': 'None'}
+        plt.rc('lines', **lines)
+        line_fit_ax[2].errorbar(wave_array[100:1950],
+                                residuals[100:1950],
+                                ecolor='midnightblue',
+                                yerr=[weights[100:1950],weights[100:1950]],
+                                marker='o',
+                                markersize=5,
+                                markerfacecolor='midnightblue',
+                                markeredgecolor='midnightblue',
+                                markeredgewidth=1,
+                                capsize=1,
+                                elinewidth=1)
+        lines = {'linestyle': '--'}
+        plt.rc('lines', **lines)
+        line_fit_ax[2].axhline(y=0,color='black')
+        lines = {'linestyle': '-'}
+        plt.rc('lines', **lines)
+        #ax[0].set_ylim(-0.2,1.0)
+        line_fit_ax[0].set_xlim(wave_array[min_index],wave_array[max_index])
+        line_fit_ax[0].set_ylim(ylim_lower,ylim_upper)
+        line_fit_ax[2].set_ylim(-5E-14,5E-14)
+        line_fit_ax[1].set_ylim(np.nanmin(weights[min_index:max_index]),np.nanmax(weights[min_index:max_index]))
+        for ranges in sky_dict.values():
+            line_fit_ax[0].axvspan(ranges[0],ranges[1],alpha=0.5,color='grey')
+        fig.subplots_adjust(hspace=.0)
+        yticks = line_fit_ax[0].yaxis.get_major_ticks()
+        yticks[0].label1.set_visible(False)
+        # tick parameters 
+        line_fit_ax[0].tick_params(axis='both',
+                       which='major',
+                       labelsize=26,
+                       length=12,
+                       width=4)
+        line_fit_ax[0].tick_params(axis='both',
+                       which='minor',
+                       labelsize=26,
+                       length=6,
+                       width=4)
+        line_fit_ax[0].minorticks_on()
+        line_fit_ax[0].yaxis.get_offset_text().set_fontsize(26)
+        [i.set_linewidth(4.0) for i in line_fit_ax[0].spines.itervalues()]
+        # tick parameters 
+        line_fit_ax[1].tick_params(axis='both',
+                       which='major',
+                       labelsize=18,
+                       length=12,
+                       width=4)
+        line_fit_ax[1].tick_params(axis='both',
+                       which='minor',
+                       labelsize=18,
+                       length=6,
+                       width=4)
+        [i.set_linewidth(4.0) for i in line_fit_ax[1].spines.itervalues()]
+        line_fit_ax[2].tick_params(axis='both',
+                       which='major',
+                       labelsize=18,
+                       length=12,
+                       width=4)
+        line_fit_ax[2].tick_params(axis='both',
+                       which='minor',
+                       labelsize=18,
+                       length=6,
+                       width=4)
+        [i.set_linewidth(4.0) for i in line_fit_ax[2].spines.itervalues()]
+    #    ax[0].yaxis.set_major_locator(MaxNLocator(prune='lower'))
+    #    ax[0].yaxis.set_major_locator(MaxNLocator(integer=True))
+        plt.show(line_fit_fig)
+        line_fit_fig.savefig(plot_save_name)
+        plt.close(line_fit_fig)
 
     return output_array
 
@@ -752,9 +743,12 @@ def k_band_mod(tol,
         nii_shifted_max = nii_shifted + tol
 
         # find the fitting range
-        fitting_range_limit = 0.01
+        fitting_range_limit = 0.004
         min_index = np.argmin(abs(wave_array - (h_alpha_shifted - fitting_range_limit)))
         max_index = np.argmin(abs(wave_array - (nii_shifted + fitting_range_limit)))
+
+        # constrain the NII centre
+        delta_nii = nii_rest - h_alpha_rest
 
         # construct a composite gaussian model with prefix parameter names
         comp_mod = GaussianModel(missing='drop',
@@ -775,16 +769,17 @@ def k_band_mod(tol,
                                 min=0)
         comp_mod.set_param_hint('ha_sigma',
                                 value=0.001,
-                                min=0)
+                                min=0.0004,
+                                max=0.004)
         comp_mod.set_param_hint('nii_center',
                                 value=nii_shifted,
-                                min=nii_shifted_min,
-                                max=nii_shifted_max)
+                                expr='ha_center + ((%.6f)*%.6f)' % (1.+redshift,delta_nii))
         comp_mod.set_param_hint('nii_amplitude',
                                 value=0.01,
                                 min=0)
         comp_mod.set_param_hint('nii_sigma',
-                                value=0.001)
+                                value=0.001,
+                                expr='1.*ha_sigma')
 
         comp_mod.set_param_hint('c',
                                 value=0.0,
@@ -808,9 +803,10 @@ def k_band_mod(tol,
 
         # wavelength separation of the two doubly ionised oxygen lines
         delta_oiii = oiii_5008_rest - oiii_4960_rest
+        delta_hb = oiii_5008_rest - h_beta_rest
 
         # find the fitting range
-        fitting_range_limit = 0.01
+        fitting_range_limit = 0.004
         min_index = np.argmin(abs(wave_array - (h_beta_shifted - fitting_range_limit)))
         max_index = np.argmin(abs(wave_array - (oiii_5008_shifted + fitting_range_limit)))
 
@@ -827,8 +823,7 @@ def k_band_mod(tol,
 
         comp_mod.set_param_hint('hb_center',
                                 value=h_beta_shifted,
-                                min=h_beta_shifted_min,
-                                max=h_beta_shifted_max)
+                                expr='oiii5_center - ((%.6f)*%.6f)' % (1.+redshift,delta_hb))
         comp_mod.set_param_hint('hb_amplitude',
                                 value=0.01,
                                 min=0)
@@ -836,32 +831,32 @@ def k_band_mod(tol,
                                 value=oiii_4960_shifted,
                                 expr='oiii5_center - ((%.6f)*%.6f)' % (1.+redshift,delta_oiii))
         comp_mod.set_param_hint('oiii4_amplitude',
-                                value=0.3,
+                                value=0.015,
                                 expr='0.3448*oiii5_amplitude')
         comp_mod.set_param_hint('oiii5_center',
                                 value=oiii_5008_shifted,
                                 min=oiii_5008_shifted_min,
                                 max=oiii_5008_shifted_max)
         comp_mod.set_param_hint('oiii5_amplitude',
-                                value=0.9,
+                                value=0.05,
                                 min=0)
         comp_mod.set_param_hint('oiii5_sigma',
                                 value=0.001,
-                                min=0.0004,
-                                max=0.002)
+                                expr='1.*oiii5_sigma')
         comp_mod.set_param_hint('oiii4_sigma',
                                 value=0.001,
-                                expr='1.*oiii5_sigma')
+                                min=0.0004,
+                                max=0.002)
         comp_mod.set_param_hint('hb_sigma',
                                 value=0.001,
-                                min=0.0004,
-                                max=0.0016)
+                                expr='1.*oiii5_sigma/%.6f' % (oiii_5008_shifted/h_beta_shifted))
 
         comp_mod.set_param_hint('c',
                                 value=0.0,
                                 vary=False)
 
         pars = comp_mod.make_params()
+
 
     return [comp_mod,pars,min_index,max_index]
 
@@ -894,9 +889,10 @@ def h_band_mod(tol,
 
         # wavelength separation of the two doubly ionised oxygen lines
         delta_oiii = oiii_5008_rest - oiii_4960_rest
+        delta_hb = oiii_5008_rest - h_beta_rest
 
         # find the fitting range
-        fitting_range_limit = 0.01
+        fitting_range_limit = 0.004
         min_index = np.argmin(abs(wave_array - (h_beta_shifted - fitting_range_limit)))
         max_index = np.argmin(abs(wave_array - (oiii_5008_shifted + fitting_range_limit)))
 
@@ -913,8 +909,7 @@ def h_band_mod(tol,
 
         comp_mod.set_param_hint('hb_center',
                                 value=h_beta_shifted,
-                                min=h_beta_shifted_min,
-                                max=h_beta_shifted_max)
+                                expr='oiii5_center - ((%.6f)*%.6f)' % (1.+redshift,delta_hb))
         comp_mod.set_param_hint('hb_amplitude',
                                 value=0.01,
                                 min=0)
@@ -940,8 +935,7 @@ def h_band_mod(tol,
                                 expr='1.*oiii5_sigma')
         comp_mod.set_param_hint('hb_sigma',
                                 value=0.001,
-                                min=0.0004,
-                                max=0.0016)
+                                expr='1.*oiii5_sigma/%.6f' % (oiii_5008_shifted/h_beta_shifted))
 
         comp_mod.set_param_hint('c',
                                 value=0.0,
@@ -966,7 +960,7 @@ def h_band_mod(tol,
         delta_oii = oii_3729_rest - oii_3727_rest
 
         # find the fitting range
-        fitting_range_limit = 0.01
+        fitting_range_limit = 0.004
         min_index = np.argmin(abs(wave_array - (oii_3727_shifted - fitting_range_limit)))
         max_index = np.argmin(abs(wave_array - (oii_3729_shifted + fitting_range_limit)))
 
@@ -1036,7 +1030,7 @@ def yj_band_mod(tol,
     delta_oii = oii_3729_rest - oii_3727_rest
 
     # find the fitting range
-    fitting_range_limit = 0.01
+    fitting_range_limit = 0.003
     min_index = np.argmin(abs(wave_array - (oii_3727_shifted - fitting_range_limit)))
     max_index = np.argmin(abs(wave_array - (oii_3729_shifted + fitting_range_limit)))
 

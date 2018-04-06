@@ -275,6 +275,8 @@ def vel_field_stott_binning(incube,
         # define the skyline weights array
         weights_file = incube[:-5] + '_error_spectrum' + str(smoothing_psf).replace(".", "") + str(spectral_smooth_width) + '.fits'
 
+        print '[INFO: ] using weights file: %s' % weights_file
+
     elif spatial_smooth and not(spectral_smooth):
 
         print '[INFO:  ] smoothing data spatially with %s filter' % smoothing_psf
@@ -314,6 +316,8 @@ def vel_field_stott_binning(incube,
         # define the weights file
         weights_file = incube[:-5] + '_error_spectrum' + str(smoothing_psf).replace(".", "") + '.fits'
 
+        print '[INFO: ] using weights file: %s' % weights_file
+
     elif spectral_smooth and not(spatial_smooth):
 
         print '[INFO:  ] smoothing data spectrally with %s filter' % spectral_smooth_width
@@ -340,11 +344,15 @@ def vel_field_stott_binning(incube,
         # define the weights file
         weights_file = incube[:-5] + '_error_spectrum' + str(spectral_smooth_width) + '.fits'
 
+        print '[INFO: ] using weights file: %s' % weights_file
+
     else:
 
         weights_file = incube[:-5] + '_error_spectrum.fits' 
 
         print '[INFO:  ] No data smoothing selected'
+
+        print '[INFO: ] using weights file: %s' % weights_file
 
     weights_array = fits.open(weights_file)[0].data
 
@@ -493,6 +501,8 @@ def vel_field_stott_binning(incube,
     disp_array = np.empty(shape=(xpixs, ypixs))
 
     flux_array = np.empty(shape=(xpixs, ypixs))
+
+    flux_error_array = np.empty(shape=(xpixs, ypixs))
 
     vel_error_array = np.empty(shape=(xpixs, ypixs))
 
@@ -938,6 +948,7 @@ def vel_field_stott_binning(incube,
                 vel_array[i, j] = np.nan
                 disp_array[i, j] = np.nan
                 flux_array[i, j] = np.nan
+                flux_error_array[i, j] = np.nan
                 vel_error_array[i, j] = np.nan
                 sig_error_array[i, j] = np.nan
                 rejection_array[i, j] = 0
@@ -1031,7 +1042,7 @@ def vel_field_stott_binning(incube,
                         mc_amp_array.append(gauss_values['amplitude'])
                         mc_centre_array.append(gauss_values['center'])
 
-                print 'This is how many survived %s' % len(mc_sig_array)
+                # print 'This is how many survived %s' % len(mc_sig_array)
                 # np array the resultant mc arrays
 
                 mc_sig_array = np.array(mc_sig_array)
@@ -1087,6 +1098,7 @@ def vel_field_stott_binning(incube,
                     disp_array[i, j] = np.nan
 
                 flux_array[i, j] = amp_gauss_values['center']*spaxel_median_flux
+                flux_error_array[i, j] = amp_gauss_values['sigma']*spaxel_median_flux
                 vel_error_array[i, j] = vel_gauss_values['sigma']
                 sig_error_array[i, j] = sig_gauss_values['sigma']
 
@@ -1098,6 +1110,7 @@ def vel_field_stott_binning(incube,
                 vel_array[i, j] = np.nan
                 disp_array[i, j] = np.nan
                 flux_array[i, j] = np.nan
+                flux_error_array[i, j] = np.nan
                 vel_error_array[i, j] = np.nan
                 sig_error_array[i, j] = np.nan
                 rejection_array = 2.0
@@ -1269,7 +1282,7 @@ def vel_field_stott_binning(incube,
                             mc_amp_array.append(gauss_values['amplitude'])
                             mc_centre_array.append(gauss_values['center'])
 
-                    print 'This is how many survived %s' % len(mc_sig_array)
+                    # print 'This is how many survived %s' % len(mc_sig_array)
                     # np array the resultant mc arrays
 
                     mc_sig_array = np.array(mc_sig_array)
@@ -1330,6 +1343,7 @@ def vel_field_stott_binning(incube,
                         disp_array[i, j] = np.nan
 
                     flux_array[i, j] = amp_gauss_values['center']*spaxel_median_flux
+                    flux_error_array[i, j] = amp_gauss_values['sigma']*spaxel_median_flux
                     vel_error_array[i, j] = vel_gauss_values['sigma']
                     sig_error_array[i, j] = sig_gauss_values['sigma']
 
@@ -1342,6 +1356,7 @@ def vel_field_stott_binning(incube,
                     vel_array[i, j] = np.nan
                     disp_array[i, j] = np.nan
                     flux_array[i, j] = np.nan
+                    flux_error_array[i, j] = np.nan
                     vel_error_array[i, j] = np.nan
                     sig_error_array[i, j] = np.nan
                     rejection_array[i, j] = 2.0
@@ -1511,7 +1526,7 @@ def vel_field_stott_binning(incube,
                                 mc_amp_array.append(gauss_values['amplitude'])
                                 mc_centre_array.append(gauss_values['center'])
 
-                        print 'This is how many survived %s' % len(mc_sig_array)
+                        # print 'This is how many survived %s' % len(mc_sig_array)
                         # np array the resultant mc arrays
 
                         mc_sig_array = np.array(mc_sig_array)
@@ -1565,6 +1580,7 @@ def vel_field_stott_binning(incube,
                             disp_array[i, j] = np.nan
 
                         flux_array[i, j] = amp_gauss_values['center']*spaxel_median_flux
+                        flux_error_array[i, j] = amp_gauss_values['sigma']*spaxel_median_flux
                         vel_error_array[i, j] = vel_gauss_values['sigma']
                         sig_error_array[i, j] = sig_gauss_values['sigma']
 
@@ -1577,6 +1593,7 @@ def vel_field_stott_binning(incube,
                         vel_array[i, j] = np.nan
                         disp_array[i, j] = np.nan
                         flux_array[i, j] = np.nan
+                        flux_error_array[i, j] = np.nan
                         vel_error_array[i, j] = np.nan
                         sig_error_array[i, j] = np.nan
 
@@ -1621,6 +1638,7 @@ def vel_field_stott_binning(incube,
                         vel_array[i, j] = np.nan
                         disp_array[i, j] = np.nan
                         flux_array[i, j] = np.nan
+                        flux_error_array[i, j] = np.nan
                         vel_error_array[i, j] = np.nan
                         sig_error_array[i, j] = np.nan
                         rejection_array[i, j] = 11
@@ -2074,6 +2092,12 @@ def vel_field_stott_binning(incube,
     flux_hdu.writeto('%s_%s_flux_field.fits' % (incube[:-5],
                                                 line),
                      clobber=True)
+
+    flux_error_hdu = fits.PrimaryHDU(flux_error_array)
+
+    flux_error_hdu.writeto('%s_%s_flux_error_field.fits' % (incube[:-5],
+                                                            line),
+                           clobber=True)
 
     vel_hdu = fits.PrimaryHDU(masked_vel_array)
 
@@ -3085,12 +3109,12 @@ def oii_gauss_fit(fit_wl,
                   weight_fit):
 
     # define the line wavelengths
-    oii_3727_rest = 0.3727092
+    oii_3727_rest = 0.372709
     oii_3727_shifted = (1 + redshift) * oii_3727_rest
 
     # note we'll use an expression to define the position of this
     # rather than defining minimum and max and shifted
-    oii_3729_rest = 0.3729875
+    oii_3729_rest = 0.372988
     oii_3729_shifted = (1 + redshift) * oii_3729_rest
 
     # separation between the two
@@ -3100,8 +3124,8 @@ def oii_gauss_fit(fit_wl,
 
     pars = gmod.guess(fit_flux, x=fit_wl)
 
-    sig_guess = pars.valuesdict()['sigma']
-    amp_guess = pars.valuesdict()['amplitude']
+    sig_guess = pars.valuesdict()['sigma']/2.
+    amp_guess = pars.valuesdict()['amplitude']/2.
 
     # construct a composite gaussian model with prefix parameter names
     comp_mod = GaussianModel(missing='drop',
@@ -3117,7 +3141,8 @@ def oii_gauss_fit(fit_wl,
                             value=oii_3729_shifted,
                             expr='((%.6f)*%.6f) + oiil_center' % (1.+redshift,delta_oii))
     comp_mod.set_param_hint('oiil_amplitude',
-                            value=amp_guess)
+                            value=amp_guess,
+                            min=0)
     comp_mod.set_param_hint('oiih_amplitude',
                             value=amp_guess,
                             expr='1.*oiil_amplitude')
