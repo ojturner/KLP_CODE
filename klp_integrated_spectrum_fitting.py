@@ -355,7 +355,7 @@ def line_fit(wave_array,
     if filt == 'K':
         # print 'K-band fitting'
         sky_dict = mask_the_sky.ret_k_sky()
-        tol = 0.0010
+        tol = 0.0015
         comp_mod, pars, min_index, max_index = k_band_mod(tol,
                                                           redshift,
                                                           wave_array,
@@ -364,7 +364,7 @@ def line_fit(wave_array,
     elif filt == 'H':
         # print 'H-band fitting'
         sky_dict = mask_the_sky.ret_h_sky()
-        tol = 0.0010
+        tol = 0.0015
         comp_mod, pars, min_index, max_index = h_band_mod(tol,
                                                           redshift,
                                                           wave_array,
@@ -373,7 +373,7 @@ def line_fit(wave_array,
     elif filt == 'YJ':
         # print 'YJ-band fitting'
         sky_dict = mask_the_sky.ret_yj_sky()
-        tol = 0.0003
+        tol = 0.0015
         comp_mod, pars, min_index, max_index = yj_band_mod(tol,
                                                            redshift,
                                                            wave_array)
@@ -381,8 +381,12 @@ def line_fit(wave_array,
     # also return a total masked spectrum which blocks out
     # emission lines
 
+    waveopolis, spec_em_total = mask_the_sky.masking_sky(wave_array,
+                                                         spec,
+                                                         filt)
+
     spec_total = klp_spax_fit.mask_emission_lines(wave_array,
-                                                  spec,
+                                                  spec_em_total,
                                                   redshift,
                                                   filt,
                                                   prog)
@@ -411,11 +415,11 @@ def line_fit(wave_array,
     #print bins, centres
     noise_best_fit = noise_result.eval(x=centres[:-1])
 
-    fig, ax = plt.subplots(1,1,figsize=(8,10))
-    ax.scatter(centres[:-1],bins)
-    ax.plot(centres[:-1],noise_best_fit)
-    #plt.show()
-    plt.close('all')
+#    fig, ax = plt.subplots(1,1,figsize=(8,10))
+#    ax.scatter(centres[:-1],bins)
+#    ax.plot(centres[:-1],noise_best_fit)
+#    #plt.show()
+#    plt.close('all')
 
     noise = abs(noise_result.best_values['sigma']*masked_median)
 
